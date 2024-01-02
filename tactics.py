@@ -61,7 +61,7 @@ class Tactics():
         self.update_inventory()
         self.current_gold = 0
         self.update_gold_amount()
-        self.current_position = self.get_player_position()
+        self.current_position, _ = self.get_player_position()
         self.current_moves = 0
         self.over = False
         
@@ -158,6 +158,35 @@ class Tactics():
                     if abs(i-my_position[0]) + abs(j-my_position[1]) <= 2:
                         return True
         return False
+    
+    def manhattan_distance(self, my_position, field, map):
+        closest_field = None
+        closest_distance = 1000
+        for i, row in enumerate(map):
+            for j, f in enumerate(row):
+                if f == field:
+                    distance = abs(i-my_position[0]) + abs(j-my_position[1])
+                    if distance < closest_distance:
+                        closest_distance = distance
+                        closest_field = (i, j)
+
+        return closest_distance, closest_field
+    
+    def x_y_manhattan_distance(self, my_position, field, map):
+        closest_distance, closest_field = self.manhattan_distance(my_position, field, map)
+        x = 0
+        if my_position[1] > closest_field[1]:
+            x = 1
+        elif my_position[1] < closest_field[1]:
+            x = -1
+
+        y = 0
+        if my_position[0] > closest_field[0]:
+            y = -1
+        elif my_position[0] < closest_field[0]:
+            y = 1
+
+        return x, y, closest_distance
 
     # TODO: check for the rewards (how to handle merchant or villager)
     # TODO: change when game is over (current implementation is that 

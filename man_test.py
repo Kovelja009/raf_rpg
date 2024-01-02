@@ -5,6 +5,7 @@ if __name__ == "__main__":
     game = RafRpg()
     observation = game.render()
     print(observation)
+    print('------------------------------')
     while True:
         key = input()
         if key == 'w':
