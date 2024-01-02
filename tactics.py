@@ -150,10 +150,11 @@ class Tactics():
         url = self.url_root + "/map/full/matrix"
         response = requests.request("GET", url, headers={}, data={})
         map = response.json()
-
+        print(f'My position {my_position}')
         for i, row in enumerate(map):
             for j, field in enumerate(row):
                 if field == self.bandit:
+                    print(i, j)
                     if abs(i-my_position[0]) + abs(j-my_position[1]) <= 2:
                         return True
         return False
@@ -163,6 +164,19 @@ class Tactics():
     # the game is over when the player has reached the gate with sufficient gold)
     def get_reward(self, old_position, new_position, has_moved, new_field):
         
+        # player is attacked by a bandit
+        if self.in_bandit_range(new_position):
+            print('You are attacked by a bandit!')
+            prev_loot = self.get_inventory_value()
+            self.update_inventory()
+            curr_loot = self.get_inventory_value()
+
+            # return how much loot the player has lost multiplied by the bandit rate
+            # so that the agent is encouraged to avoid bandits
+            print(f'Bandit scaled: {(curr_loot - prev_loot) * self.bandit_rate}')
+            return (curr_loot - prev_loot) * self.bandit_rate
+
+
         # player has moved to a undiscoverd field
         if new_field in self.undiscovered:
             prev_loot = self.get_inventory_value()
@@ -199,6 +213,7 @@ class Tactics():
             curr_gold = self.current_gold
             # return how much gold the player has earned multiplied by the merchant rate
             # so that the agent is encouraged to sell more items
+            print(f'Merchant scaled: {(curr_gold - prev_gold) * self.merchant_rate}')
             return (curr_gold - prev_gold) * self.merchant_rate
         
         # player has moved to the gate 
@@ -214,16 +229,5 @@ class Tactics():
         # player hasn't reached the gate in sufficient time
         if self.current_moves >= self.max_moves:
             return -100
-        
-        # player is attacked by a bandit
-        if self.in_bandit_range(new_position):
-            print('You are attacked by a bandit!')
-            prev_loot = self.get_inventory_value()
-            self.update_inventory()
-            curr_loot = self.get_inventory_value()
-
-            # return how much loot the player has lost multiplied by the bandit rate
-            # so that the agent is encouraged to avoid bandits
-            return (curr_loot - prev_loot) * self.bandit_rate
 
         
