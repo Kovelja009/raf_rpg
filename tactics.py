@@ -24,9 +24,11 @@ import time
 # Merchant ('M')
 
 class Tactics():
-    def __init__(self, url_root, max_moves=500, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bone', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
+    def __init__(self, url_root, max_moves=500, merchant_rate=1.5, bandit_rate=0.75, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bone', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
         self.max_moves = max_moves
         self.url_root = url_root
+        self.merchant_rate = merchant_rate
+        self.bandit_rate = bandit_rate
 
         # Values of items
         self.item_values = {'Diamond': 20, 'Gem': 14, 'Apple': 7, 'Rice': 4, 'Stone': 3, 'Wood': 2, 'Bone': 2, 'Grass': 0}
@@ -52,12 +54,16 @@ class Tactics():
         self.gate = '|'
         self.mountain = '$'
         self.discovered = ['.', ':', '<']
+        self.undiscovered = ['_', '+', '>']
         self.unreachable = [self.water, self.mountain]
 
         self.current_inventory = None
         self.update_inventory()
+        self.current_gold = 0
+        self.update_gold_amount()
         self.current_position = self.get_player_position()
         self.current_moves = 0
+        self.over = False
         
     def get_field_reward(self, field_rwd):
         reward = 0
@@ -67,7 +73,7 @@ class Tactics():
         return reward/len(field_rwd)
     
 
-    def get_player_position(self):
+    def get_player_position(self, action=None):
         url = self.url_root + "/map/full/matrix"
         response = requests.request("GET", url, headers={}, data={})
         map = response.json()
@@ -75,12 +81,16 @@ class Tactics():
         for i, row in enumerate(map):
             for j, field in enumerate(row):
                 if field == self.player:
-                    return (i, j)
+                    if action in [[1,0,0,0,0], [0,1,0,0,0], [0,0,1,0,0], [0,0,0,1,0]]:
+                        return (i, j), map[i-action[0]+action[1]][j+action[3]-action[2]]
+                    else:
+                        return (i, j), self.player
         print('Error: There is no player on the map!')
         return None
     
     def step(self, action):
-        prev_position = self.get_player_position()
+        prev_position, next_field = self.get_player_position(action)
+
 
         url_sufix = "wait"
         if action == [1,0,0,0,0]:
@@ -101,8 +111,8 @@ class Tactics():
         time.sleep(0.2)
 
         self.current_moves += 1
-        self.current_position = self.get_player_position()
-        return prev_position, self.current_position
+        self.current_position, _ = self.get_player_position()
+        return prev_position, self.current_position, next_field
         
     def has_moved(self, action):
         if action == [0,0,0,0,1]:
@@ -111,7 +121,7 @@ class Tactics():
     
 
     def is_over(self):
-        if self.current_moves >= self.max_moves:
+        if self.current_moves >= self.max_moves or self.over:
             return True
         return False
 
@@ -130,22 +140,90 @@ class Tactics():
             self.current_inventory = {'Diamond': 0, 'Gem': 0, 'Apple': 0, 'Rice': 0, 'Stone': 0, 'Wood': 0, 'Bone': 0, 'Grass': 0}
         else:
             self.current_inventory = inventory
-        
+
+    def update_gold_amount(self):
+        url = self.url_root + "/player/inventory/gold"
+        response = requests.request("GET", url, headers={}, data={})
+        self.current_gold = response.json()
+
+    def in_bandit_range(self, my_position):
+        url = self.url_root + "/map/full/matrix"
+        response = requests.request("GET", url, headers={}, data={})
+        map = response.json()
+
+        for i, row in enumerate(map):
+            for j, field in enumerate(row):
+                if field == self.bandit:
+                    if abs(i-my_position[0]) + abs(j-my_position[1]) <= 2:
+                        return True
+        return False
 
     # TODO: check for the rewards (how to handle merchant or villager)
-    # TODO: implement other types of rewards
-    def get_reward(self, old_position, new_position, has_moved):
+    # TODO: change when game is over (current implementation is that 
+    # the game is over when the player has reached the gate with sufficient gold)
+    def get_reward(self, old_position, new_position, has_moved, new_field):
         
-        # player most likely has played invalid move
-        if old_position == new_position and has_moved:
+        # player has moved to a undiscoverd field
+        if new_field in self.undiscovered:
+            prev_loot = self.get_inventory_value()
+            self.update_inventory()
+            curr_loot = self.get_inventory_value()
+            return curr_loot - prev_loot
+        
+        # player has moved to a harvested field
+        if new_field in self.discovered:
+            return -2
+        
+        # player has moved to a unreachable field
+        if new_field in self.unreachable:
             print('Illegal move!')
             return self.illegal_move
         
-        # player has moved or interacted with the villager
-        prev_loot = self.get_inventory_value()
-        self.update_inventory()
-        curr_loot = self.get_inventory_value()
+        # player is waiting
+        if has_moved == False:
+            return -2
+        
+        # player has moved to a villager
+        if new_field == self.villager:
+            print('Villager is giving you a gift!')
+            prev_loot = self.get_inventory_value()
+            self.update_inventory()
+            curr_loot = self.get_inventory_value()
+            return curr_loot - prev_loot
+        
+        # player has moved to a merchant
+        if new_field == self.merchant:
+            print('Merchant is buying your items!')
+            prev_gold = self.current_gold
+            self.update_gold_amount()
+            curr_gold = self.current_gold
+            # return how much gold the player has earned multiplied by the merchant rate
+            # so that the agent is encouraged to sell more items
+            return (curr_gold - prev_gold) * self.merchant_rate
+        
+        # player has moved to the gate 
+        if new_field == self.gate and self.current_moves < self.max_moves:
+            # with enough gold
+            if self.current_gold >= 50:
+                self.over = True
+                return 100
+            # without enough gold
+            else:
+                return -2
+        
+        # player hasn't reached the gate in sufficient time
+        if self.current_moves >= self.max_moves:
+            return -100
+        
+        # player is attacked by a bandit
+        if self.in_bandit_range(new_position):
+            print('You are attacked by a bandit!')
+            prev_loot = self.get_inventory_value()
+            self.update_inventory()
+            curr_loot = self.get_inventory_value()
 
-        return curr_loot - prev_loot 
+            # return how much loot the player has lost multiplied by the bandit rate
+            # so that the agent is encouraged to avoid bandits
+            return (curr_loot - prev_loot) * self.bandit_rate
 
         
