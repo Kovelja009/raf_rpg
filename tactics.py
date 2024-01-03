@@ -64,6 +64,7 @@ class Tactics():
         self.current_position, _ = self.get_player_position()
         self.current_moves = 0
         self.over = False
+        self.current_map = self.get_map()
         
     def get_field_reward(self, field_rwd):
         reward = 0
@@ -74,9 +75,7 @@ class Tactics():
     
 
     def get_player_position(self, action=None):
-        url = self.url_root + "/map/full/matrix"
-        response = requests.request("GET", url, headers={}, data={})
-        map = response.json()
+        map = self.get_map()
 
         for i, row in enumerate(map):
             for j, field in enumerate(row):
@@ -88,9 +87,15 @@ class Tactics():
         print('Error: There is no player on the map!')
         return None
     
+    def get_map(self):
+        url = self.url_root + "/map/full/matrix"
+        response = requests.request("GET", url, headers={}, data={})
+        map = response.json()
+        return map
+
+    
     def step(self, action):
         prev_position, next_field = self.get_player_position(action)
-
 
         url_sufix = "wait"
         if action == [1,0,0,0,0]:
@@ -112,6 +117,7 @@ class Tactics():
 
         self.current_moves += 1
         self.current_position, _ = self.get_player_position()
+        self.current_map = self.get_map()
         return prev_position, self.current_position, next_field
         
     def has_moved(self, action):
@@ -146,10 +152,7 @@ class Tactics():
         response = requests.request("GET", url, headers={}, data={})
         self.current_gold = response.json()
 
-    def in_bandit_range(self, my_position):
-        url = self.url_root + "/map/full/matrix"
-        response = requests.request("GET", url, headers={}, data={})
-        map = response.json()
+    def in_bandit_range(self, my_position, map):
         print(f'My position {my_position}')
         for i, row in enumerate(map):
             for j, field in enumerate(row):
@@ -187,14 +190,83 @@ class Tactics():
             y = 1
 
         return x, y, closest_distance
+     
 
-    # TODO: check for the rewards (how to handle merchant or villager)
-    # TODO: change when game is over (current implementation is that 
-    # the game is over when the player has reached the gate with sufficient gold)
+    # TODO: subject to change
+
+    # DISCUSS:
+    #   - current gold, current inventory value, seperate, or maybe cumulative
+    #     (currently it is cumulative amount)?
+
+
+    def neural_network_input(self, my_position, map):
+        # x-y-distance to the closest villager
+        xv, yv, dv = self.x_y_manhattan_distance(my_position, self.villager, map)
+        
+        # x-y-distance to the closest merchant
+        xm, ym, dm = self.x_y_manhattan_distance(my_position, self.merchant, map)
+
+        # x-y-distance to the closest bandit
+        xb, yb, db = self.x_y_manhattan_distance(my_position, self.bandit, map)
+
+        # x-y-distance to the closest undiscovered field
+        xund, yund, dund = 100, 100, 100
+        for elem in self.undiscovered:
+            x, y, d = self.x_y_manhattan_distance(my_position, elem, map)
+            if d < dund:
+                xund, yund, dund = x, y, d
+
+        # x-y-distance to the closest invalid field
+        xinv, yinv, dinv = 100, 100, 100
+        for elem in self.unreachable:
+            x, y, d = self.x_y_manhattan_distance(my_position, elem, map)
+            if d < dinv:
+                xinv, yinv, dinv = x, y, d
+
+        # amount of cum gold (inventory + gold)
+        cum_gold = self.current_gold + self.get_inventory_value()
+
+        # amount of cum moves
+        cum_moves = self.current_moves
+
+
+        print(f'Villager distance: {dv}')
+        print(f'Merchant distance: {dm}')
+        print(f'Bandit distance: {db}')
+        print(f'Undiscovered distance: {dund}')
+        print(f'Invalid distance: {dinv}')
+        print(f'Cum gold (inv + gold): {cum_gold}')
+        print(f'Cum moves: {cum_moves}')
+        print('------------------------------------')
+
+        return [xv, yv, dv, xm, ym, dm, xb, yb, db, xund, yund, dund, xinv, yinv, dinv, cum_gold, cum_moves]
+
+    
+    # NOTES:[1] game is over if player has enough gold or has run out of moves or 
+    #           has reached the gate with enough gold
+    #       [2] even though we might have enougn gold, merchant might not buy all of our items
+    #           so we need to wait few more moves to sell the rest of the items (when merchant replenishes)
     def get_reward(self, old_position, new_position, has_moved, new_field):
+
+        # player hasn't reached the gate in sufficient time
+        if self.current_moves >= self.max_moves:
+            print('You have run out of time!')
+            self.over = True
+            return -100
+
+        # player has enough gold to finish the game, thus the game is over
+        # for the RL agent
+        if self.current_gold >= 50:
+            self.over = True
+            print('You have sufficient amout of gold, now go and finished the game!')
+            return 100
+
+        # player is waiting
+        if has_moved == False:
+            return -2
         
         # player is attacked by a bandit
-        if self.in_bandit_range(new_position):
+        if self.in_bandit_range(new_position, self.current_map):
             print('You are attacked by a bandit!')
             prev_loot = self.get_inventory_value()
             self.update_inventory()
@@ -222,10 +294,6 @@ class Tactics():
             print('Illegal move!')
             return self.illegal_move
         
-        # player is waiting
-        if has_moved == False:
-            return -2
-        
         # player has moved to a villager
         if new_field == self.villager:
             print('Villager is giving you a gift!')
@@ -240,9 +308,16 @@ class Tactics():
             prev_gold = self.current_gold
             self.update_gold_amount()
             curr_gold = self.current_gold
+            self.update_inventory()
+
+            if self.current_gold >= 50:
+                self.over = True
+                print('You have sufficient amout of gold, now go and finished the game!')
+                return 100
+
             # return how much gold the player has earned multiplied by the merchant rate
             # so that the agent is encouraged to sell more items
-            print(f'Merchant scaled: {(curr_gold - prev_gold) * self.merchant_rate}')
+            print(f'Merchant scaled: {(curr_gold - prev_gold) * self.merchant_rate}, but sold: {curr_gold - prev_gold}')
             return (curr_gold - prev_gold) * self.merchant_rate
         
         # player has moved to the gate 
@@ -250,13 +325,13 @@ class Tactics():
             # with enough gold
             if self.current_gold >= 50:
                 self.over = True
+                print('You have reached the gate and finished the whole level!')
                 return 100
             # without enough gold
             else:
                 return -2
+            
         
-        # player hasn't reached the gate in sufficient time
-        if self.current_moves >= self.max_moves:
-            return -100
+
 
         

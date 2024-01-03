@@ -4,9 +4,14 @@ import numpy as np
 if __name__ == "__main__":
     game = RafRpg()
     observation = game.render()
-    print(observation)
     print('------------------------------')
     while True:
+        observation = game.tactics.current_map
+        print(observation)
+        print('####')
+        print(f"Real amount of gold is {game.tactics.current_gold}")
+        print('####')
+        game.tactics.neural_network_input(game.tactics.current_position, observation)
         key = input()
         if key == 'w':
             up = [1,0,0,0,0]
@@ -36,6 +41,7 @@ if __name__ == "__main__":
             break
         else:
             print("Invalid input")
+
 
         if is_over:
             print("Game over")

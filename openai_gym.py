@@ -34,13 +34,9 @@ class RafRpg(gym.Env):
     prev, curr, new_field = self.tactics.step(action)
     reward = self.tactics.get_reward(prev, curr, has_moved=self.tactics.has_moved(action), new_field=new_field)
 
-    url = self.url_root + "/map/full/matrix"
-    response = requests.request("GET", url, headers={}, data={})
-    next_observation = response.json()
-
     is_over = self.tactics.is_over()
 
-    return next_observation, reward, is_over, {}
+    return self.tactics.current_map, reward, is_over, {}
 
   def render(self):
     payload={}
