@@ -8,9 +8,9 @@ import os
 class DeepQNet(nn.Module):
     def __init__(self, input_size, output_size):
         super(DeepQNet, self).__init__()
-        self.hidden1 = nn.Linear(input_size, 128)
-        self.hidden2 = nn.Linear(128, 64)
-        self.output = nn.Linear(64, output_size)
+        self.hidden1 = nn.Linear(input_size,192)
+        self.hidden2 = nn.Linear(192, 128)
+        self.output = nn.Linear(128, output_size)
 
     def forward(self, x):
         x = F.relu(self.hidden1(x))
@@ -25,6 +25,7 @@ class DeepQNet(nn.Module):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         timestamped_file_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.pth"
         file_path = os.path.join(model_folder_path, timestamped_file_name)
+        print(f"Saving model to {file_path}")
         torch.save(self.state_dict(), file_path)
 
 
@@ -34,7 +35,7 @@ class DQNTrainer:
         self.gamma = gamma # tune gamma [0.9, 0.99]
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
-        self.criterion = nn.HuberLoss() # tune delta
+        self.criterion = nn.MSELoss() # tune delta
 
     # reward = immediate reward after performing the action
     # next_state = state after action is performed
@@ -52,23 +53,43 @@ class DQNTrainer:
             reward = torch.unsqueeze(reward, 0)
             done = (done, )
 
-        predicted_q_values = self.model(state)
+        # predicted_q_values = self.model(state)
 
-        target_q_values = predicted_q_values.clone()
-        for idx in range(len(done)):
-            updated_q_value = reward[idx]
+        # target_q_values = predicted_q_values.clone()
+        # for idx in range(len(done)):
+        #     updated_q_value = reward[idx]
 
-            if not done[idx]:
-                future_q_values = self.model(next_state[idx])
-                max_future_q = torch.max(future_q_values) # or use mean, because environment is nondeterministic
-                discounted_max_future_q = self.gamma * max_future_q
-                updated_q_value = reward[idx] + discounted_max_future_q
+        #     if not done[idx]:
+        #         future_q_values = self.model(next_state[idx])
+        #         max_future_q = torch.max(future_q_values) # or use mean, because environment is nondeterministic
+        #         discounted_max_future_q = self.gamma * max_future_q
+        #         updated_q_value = reward[idx] + discounted_max_future_q
 
-            action_taken_index = torch.argmax(action[idx]).item()
-            target_q_values[idx][action_taken_index] = updated_q_value
+        #     action_taken_index = torch.argmax(action[idx]).item()
+        #     target_q_values[idx][action_taken_index] = updated_q_value
     
+        # self.optimizer.zero_grad()
+        # self.criterion(target_q_values , predicted_q_values).backward()
+        # self.optimizer.step()
+            
+            # 1: predicted Q values with current state
+        pred = self.model(state)
+
+        target = pred.clone()
+        for idx in range(len(done)):
+            Q_new = reward[idx]
+            if not done[idx]:
+                Q_new = reward[idx] + self.gamma * torch.mean(self.model(next_state[idx])) # promenjeno sa max u mean
+
+            target[idx][torch.argmax(action[idx]).item()] = Q_new
+    
+        # 2: Q_new = r + y * max(next_predicted Q value) -> only do this if not done
+        # pred.clone()
+        # preds[argmax(action)] = Q_new
         self.optimizer.zero_grad()
-        self.criterion(target_q_values , predicted_q_values).backward()
+        loss = self.criterion(target, pred)
+        loss.backward()
+
         self.optimizer.step()
 
 

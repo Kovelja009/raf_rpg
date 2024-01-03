@@ -12,7 +12,7 @@ class RafRpg(gym.Env):
     headers = {}
     response = requests.request("PUT", url, headers=headers, data=payload)
     tt = response.json()
-    print(tt,type(tt))
+    # print(tt,type(tt))
     self.tactics = Tactics(self.url_root)
 
     
@@ -25,7 +25,7 @@ class RafRpg(gym.Env):
     headers = {}
     response = requests.request("PUT", url, headers=headers, data=payload)
     output = response.json()
-    print(output)
+    # print(output)
     self.tactics = Tactics(self.url_root)
     return output
 

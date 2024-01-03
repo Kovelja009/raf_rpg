@@ -24,14 +24,18 @@ import time
 # Merchant ('M')
 
 class Tactics():
-    def __init__(self, url_root, max_moves=500, merchant_rate=1.5, bandit_rate=0.75, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bone', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
+    def __init__(self, url_root, max_moves=200, max_gold=60, villager_rate=1.5, merchant_rate=0.2, bandit_rwd=-1000, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bones', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
         self.max_moves = max_moves
         self.url_root = url_root
+        self.max_gold = max_gold
         self.merchant_rate = merchant_rate
-        self.bandit_rate = bandit_rate
+        self.villager_rate = villager_rate
+        self.bandit_rwd = bandit_rwd
+
+        self.eval_lst = []
 
         # Values of items
-        self.item_values = {'Diamond': 20, 'Gem': 14, 'Apple': 7, 'Rice': 4, 'Stone': 3, 'Wood': 2, 'Bone': 2, 'Grass': 0}
+        self.item_values = {'Diamond': 20, 'Gem': 14, 'Apple': 7, 'Rice': 4, 'Stone': 3, 'Wood': 2, 'Bones': 2, 'Grass': 0}
 
         # Rewards for stepping on a field
         self.lawn_rwd = self.get_field_reward(lawn_rwd)
@@ -93,6 +97,30 @@ class Tactics():
         map = response.json()
         return map
 
+    def convert_idx_to_action(self, idx):
+        # up
+        if idx == 0:
+            # print('UP')
+            return [1,0,0,0,0]
+        # down
+        elif idx == 1:
+            # print('DOWN')
+            return [0,1,0,0,0]
+        # left
+        elif idx == 2:
+            # print('LEFT')
+            return [0,0,1,0,0]
+        # right
+        elif idx == 3:
+            # print('RIGHT')
+            return [0,0,0,1,0]
+        # wait
+        elif idx == 4:
+            # print('WAIT')
+            return [0,0,0,0,1]
+        else:
+            print('Error: Invalid action index!')
+            return None
     
     def step(self, action):
         prev_position, next_field = self.get_player_position(action)
@@ -143,7 +171,7 @@ class Tactics():
         inventory = response.json()
 
         if inventory == None:
-            self.current_inventory = {'Diamond': 0, 'Gem': 0, 'Apple': 0, 'Rice': 0, 'Stone': 0, 'Wood': 0, 'Bone': 0, 'Grass': 0}
+            self.current_inventory = {'Diamond': 0, 'Gem': 0, 'Apple': 0, 'Rice': 0, 'Stone': 0, 'Wood': 0, 'Bones': 0, 'Grass': 0}
         else:
             self.current_inventory = inventory
 
@@ -153,11 +181,9 @@ class Tactics():
         self.current_gold = response.json()
 
     def in_bandit_range(self, my_position, map):
-        print(f'My position {my_position}')
         for i, row in enumerate(map):
             for j, field in enumerate(row):
                 if field == self.bandit:
-                    print(i, j)
                     if abs(i-my_position[0]) + abs(j-my_position[1]) <= 2:
                         return True
         return False
@@ -165,31 +191,25 @@ class Tactics():
     def manhattan_distance(self, my_position, field, map):
         closest_field = None
         closest_distance = 1000
+        x = 1000
+        y = 1000
         for i, row in enumerate(map):
             for j, f in enumerate(row):
                 if f == field:
                     distance = abs(i-my_position[0]) + abs(j-my_position[1])
                     if distance < closest_distance:
                         closest_distance = distance
+
                         closest_field = (i, j)
 
         return closest_distance, closest_field
     
     def x_y_manhattan_distance(self, my_position, field, map):
-        closest_distance, closest_field = self.manhattan_distance(my_position, field, map)
-        x = 0
-        if my_position[1] > closest_field[1]:
-            x = 1
-        elif my_position[1] < closest_field[1]:
-            x = -1
+        distance, closest_field = self.manhattan_distance(my_position, field, map)
 
-        y = 0
-        if my_position[0] > closest_field[0]:
-            y = -1
-        elif my_position[0] < closest_field[0]:
-            y = 1
 
-        return x, y, closest_distance
+        # x, y
+        return closest_field[1] - my_position[1], closest_field[0] - my_position[0], distance
      
 
     # TODO: subject to change
@@ -199,15 +219,14 @@ class Tactics():
     #     (currently it is cumulative amount)?
 
 
-    def neural_network_input(self, my_position, map):
+# input: x-y do seljaka, x-y do bandita, x-y do neotrivenog polja, x-y do nevalidnog polja, number of moves
+    # David
+    def neural_network_input(self, my_position, map, should_print=False):
         # x-y-distance to the closest villager
-        xv, yv, dv = self.x_y_manhattan_distance(my_position, self.villager, map)
+        xv, yv, _ = self.x_y_manhattan_distance(my_position, self.villager, map)
         
-        # x-y-distance to the closest merchant
-        xm, ym, dm = self.x_y_manhattan_distance(my_position, self.merchant, map)
-
         # x-y-distance to the closest bandit
-        xb, yb, db = self.x_y_manhattan_distance(my_position, self.bandit, map)
+        xb, yb, _  = self.x_y_manhattan_distance(my_position, self.bandit, map)
 
         # x-y-distance to the closest undiscovered field
         xund, yund, dund = 100, 100, 100
@@ -223,59 +242,55 @@ class Tactics():
             if d < dinv:
                 xinv, yinv, dinv = x, y, d
 
-        # amount of cum gold (inventory + gold)
-        cum_gold = self.current_gold + self.get_inventory_value()
-
         # amount of cum moves
         cum_moves = self.current_moves
 
+        if should_print:
+            print(f'Player position: {my_position}')
+            print(f'Real amount of gold: {self.current_gold}')
+            print(f'Inventory value: {self.get_inventory_value()}')
+            print(f'Villager direction: {xv}, {yv}')
+            print(f'Bandit direction: {xb}, {yb}')
+            print(f'Undiscovered direction: {xund}, {yund}')
+            print(f'Invalid direction: {xinv}, {yinv}')
+            print(f'Cum moves: {cum_moves}')
+            print('------------------------------------')
 
-        print(f'Villager distance: {dv}')
-        print(f'Merchant distance: {dm}')
-        print(f'Bandit distance: {db}')
-        print(f'Undiscovered distance: {dund}')
-        print(f'Invalid distance: {dinv}')
-        print(f'Cum gold (inv + gold): {cum_gold}')
-        print(f'Cum moves: {cum_moves}')
-        print('------------------------------------')
-
-        return [xv, yv, dv, xm, ym, dm, xb, yb, db, xund, yund, dund, xinv, yinv, dinv, cum_gold, cum_moves]
+        return [xv, yv, xb, yb, xund, yund, xinv, yinv]
 
     
     # NOTES:[1] game is over if player has enough gold or has run out of moves or 
     #           has reached the gate with enough gold
     #       [2] even though we might have enougn gold, merchant might not buy all of our items
     #           so we need to wait few more moves to sell the rest of the items (when merchant replenishes)
+    
+    
+    # David 
     def get_reward(self, old_position, new_position, has_moved, new_field):
 
-        # player hasn't reached the gate in sufficient time
+        # player hasn't completed task in sufficient time
         if self.current_moves >= self.max_moves:
             print('You have run out of time!')
             self.over = True
             return -100
 
         # player has enough gold to finish the game, thus the game is over
-        # for the RL agent
-        if self.current_gold >= 50:
+        # for the first RL agent
+        if self.get_inventory_value() + self.current_gold >= self.max_gold:
             self.over = True
             print('You have sufficient amout of gold, now go and finished the game!')
             return 100
 
         # player is waiting
         if has_moved == False:
-            return -2
+            return -1000
         
         # player is attacked by a bandit
         if self.in_bandit_range(new_position, self.current_map):
             print('You are attacked by a bandit!')
-            prev_loot = self.get_inventory_value()
             self.update_inventory()
-            curr_loot = self.get_inventory_value()
 
-            # return how much loot the player has lost multiplied by the bandit rate
-            # so that the agent is encouraged to avoid bandits
-            print(f'Bandit scaled: {(curr_loot - prev_loot) * self.bandit_rate}')
-            return (curr_loot - prev_loot) * self.bandit_rate
+            return self.bandit_rwd
 
 
         # player has moved to a undiscoverd field
@@ -291,45 +306,38 @@ class Tactics():
         
         # player has moved to a unreachable field
         if new_field in self.unreachable:
-            print('Illegal move!')
+            # print('Illegal move!')
             return self.illegal_move
         
         # player has moved to a villager
         if new_field == self.villager:
-            print('Villager is giving you a gift!')
+            # print('Villager is giving you a gift!')
             prev_loot = self.get_inventory_value()
             self.update_inventory()
             curr_loot = self.get_inventory_value()
-            return curr_loot - prev_loot
+            return (curr_loot - prev_loot) * self.villager_rate
         
         # player has moved to a merchant
         if new_field == self.merchant:
-            print('Merchant is buying your items!')
+            # print('Merchant is buying your items!')
             prev_gold = self.current_gold
             self.update_gold_amount()
             curr_gold = self.current_gold
             self.update_inventory()
 
-            if self.current_gold >= 50:
-                self.over = True
-                print('You have sufficient amout of gold, now go and finished the game!')
-                return 100
-
-            # return how much gold the player has earned multiplied by the merchant rate
-            # so that the agent is encouraged to sell more items
-            print(f'Merchant scaled: {(curr_gold - prev_gold) * self.merchant_rate}, but sold: {curr_gold - prev_gold}')
-            return (curr_gold - prev_gold) * self.merchant_rate
+            # return how much player sold to the merchant
+            rwd = (curr_gold - prev_gold)
+            rwd_scaled = rwd * self.merchant_rate
+            # print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
+            return rwd_scaled
         
         # player has moved to the gate 
-        if new_field == self.gate and self.current_moves < self.max_moves:
-            # with enough gold
-            if self.current_gold >= 50:
-                self.over = True
-                print('You have reached the gate and finished the whole level!')
-                return 100
-            # without enough gold
-            else:
-                return -2
+        if new_field == self.gate:
+            return -2
+        
+    def eval(self):
+        return self.current_moves
+
             
         
 
