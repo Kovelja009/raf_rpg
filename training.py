@@ -43,12 +43,12 @@ if __name__ == "__main__":
     epochs = 100
     input_size = 3
     batch_size = 1
-    epsilon = 0.1
+    epsilon = 0.0
 
     game = RafRpg(input_size, map_number)
     input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
     model = DeepQNet(len(input), 5)
-    trainer = DQNTrainer(model, lr=0.001, gamma=0.95)
+    trainer = DQNTrainer(model, lr=0.001, gamma=0.2)
     should_print = False
     model_over_epochs = []
     file_path = "logs_step.txt"
@@ -120,8 +120,11 @@ if __name__ == "__main__":
 
 
 ################### kraj epohe ################
-
-        avg_loss = sum(trainer.cum_loss)/len(trainer.cum_loss)
+        if len(trainer.cum_loss) != 0:
+            avg_loss = sum(trainer.cum_loss)/len(trainer.cum_loss)
+            # save loss in logs_loss.txt
+            with open(file_path2, "a") as f:
+                f.write(f"{avg_loss}, {i}\n")
         trainer.cum_loss = []
 
         end_time = time.time()
@@ -133,15 +136,12 @@ if __name__ == "__main__":
         print(f"\nEpoch {i} finished in {end_time - start_time} seconds")
         print(f"Epoch Metric: {metric}\n")
 
-        # save loss in logs_loss.txt
-        with open(file_path2, "a") as f:
-            f.write(f"{avg_loss}, {i}\n")
 
 
 
     overall_metric = sum(model_over_epochs)/len(model_over_epochs)
     print(f"Overall metric: {overall_metric}")
-    trainer.model.save()
+    trainer.model.save(file_name="rl1_model.pth")
     # 92
     # 70
     # 33 (big network, (192, 128), big lr (0.01))

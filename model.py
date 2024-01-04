@@ -16,9 +16,9 @@ class DeepQNet(nn.Module):
         self.input_size = input_size
         self.n_kernels = 32
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(input_size, input_size), padding=0)
-        self.hidden1 = nn.Linear(self.n_kernels*1, 128)
-        self.hidden2 = nn.Linear(128, 64)
-        self.output = nn.Linear(64, output_size)
+        self.hidden1 = nn.Linear(self.n_kernels*1, 192)
+        self.hidden2 = nn.Linear(192, 128)
+        self.output = nn.Linear(128, output_size)
 
         # second convolutional iteration
         # 5x5 -> 3x3
@@ -58,9 +58,9 @@ class DeepQNet(nn.Module):
         model_folder_path = './models'
         if not os.path.exists(model_folder_path):
             os.makedirs(model_folder_path)
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        timestamped_file_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.pth"
-        file_path = os.path.join(model_folder_path, timestamped_file_name)
+        # timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        # timestamped_file_name = f"{os.path.splitext(file_name)[0]}_{timestamp}.pth"
+        file_path = os.path.join(model_folder_path, file_name)
         print(f"Saving model to {file_path}")
         torch.save(self.state_dict(), file_path)
 
