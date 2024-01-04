@@ -17,8 +17,8 @@ class DeepQNet(nn.Module):
         self.n_kernels = 32
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(input_size, input_size), padding=0)
         self.hidden1 = nn.Linear(self.n_kernels*1, 128)
-        self.hidden2 = nn.Linear(128, 164)
-        self.output = nn.Linear(128, output_size)
+        self.hidden2 = nn.Linear(128, 64)
+        self.output = nn.Linear(64, output_size)
 
         # second convolutional iteration
         # 5x5 -> 3x3
