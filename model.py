@@ -11,9 +11,9 @@ class DeepQNet(nn.Module):
         # self.hidden1 = nn.Linear(input_size,192)
         # self.hidden2 = nn.Linear(192, 128)
         # self.output = nn.Linear(128, output_size)
-
+        self.input_size = input_size
         self.n_kernels = 32
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(5,5), padding=0)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(input_size, input_size), padding=0)
         self.hidden1 = nn.Linear(self.n_kernels*1, 192)
         self.hidden2 = nn.Linear(192, 128)
         self.output = nn.Linear(128, output_size)

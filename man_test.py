@@ -7,7 +7,7 @@ if __name__ == "__main__":
     game = RafRpg()
     observation = game.render()
     inputn = game.tactics.other_input(game.tactics.current_position, observation)
-    model = DeepQNet(len(inputn), 5)
+    model = DeepQNet(len(inputn[0]), 5)
 
     print('------------------------------')
     while True:
@@ -18,7 +18,7 @@ if __name__ == "__main__":
         print('####')
         nn = game.tactics.other_input(game.tactics.current_position, observation)
         print(np.matrix(nn))
-        model(torch.tensor(nn, dtype=torch.float))
+        model(torch.tensor(nn, dtype=torch.float).unsqueeze(0))
         key = input()
         if key == 'w':
             up = [1,0,0,0,0]

@@ -37,16 +37,20 @@ import time
 
 
 if __name__ == "__main__":
-    game = RafRpg()
+    # starting with 1
+    map_number = 1
+    epochs = 30
+    batch_size = 3
+
+    game = RafRpg(map_number)
     input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
     model = DeepQNet(len(input), 5)
     trainer = DQNTrainer(model, lr=0.001, gamma=0.95)
-    epochs = 30
     should_print = False
     model_over_epochs = []
     file_path = "logs.txt"
     for i in range(epochs):
-        game.reset()
+        game.reset(map_number)
         start_time = time.time()
         print('\n')
         old_inputs = []
@@ -55,7 +59,6 @@ if __name__ == "__main__":
         new_inputs = []
         dones = []
 
-        batch_size = 1
 
         while not game.tactics.over:
             # if game.tactics.current_moves % 10 == 0:

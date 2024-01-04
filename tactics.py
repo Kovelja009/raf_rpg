@@ -50,15 +50,17 @@ class Tactics():
         self.villager_rwd = self.get_field_reward(villager_rwd)
 
         # input details
+        self.input_size = 3
+
         self.xundiscovered = 2
-        self.xdiscovered = -1
-        self.xunreachable = -3
+        self.xdiscovered = -2
+        self.xunreachable = -4
         self.xplayer = -3
         self.xvillager = 3
-        self.xbandit = -3
-        self.xmerchant = 2
-        self.xgate = -1
-        self.xout_of_bounds = -3
+        self.xbandit = -4
+        self.xmerchant = -2
+        self.xgate = -2
+        self.xout_of_bounds = -5
 
         # Characters
         self.player = 'P'
@@ -282,6 +284,11 @@ class Tactics():
 
         return [xv, yv, xb, yb, xund, yund, xdis, ydis, xinv, yinv]
     
+
+
+
+
+
         # matrix of 5x5 around the player
         # 2 - undiscovered
         # -1 - discovered
@@ -306,12 +313,25 @@ class Tactics():
         for i, row in enumerate(map):
             for j, field in enumerate(row):
                 if field == self.player:
-                    # 5x5_matrix
-                    matrix.append(self.make_row(i-2, j, map, len(map), len(map[0]), 5))
-                    matrix.append(self.make_row(i-1, j, map, len(map), len(map[0]), 5))
-                    matrix.append(self.make_row(i, j, map, len(map), len(map[0]), 5))
-                    matrix.append(self.make_row(i+1, j, map, len(map), len(map[0]), 5))
-                    matrix.append(self.make_row(i+2, j, map, len(map), len(map[0]), 5))
+                    # 5x5_matrix (initial)
+                    row_bound = int(np.floor(self.input_size/2))
+                    row_bound1 = int(np.floor(self.input_size/2))
+                    row_bound2 = 1
+
+                    for _ in range(self.input_size):
+                        if row_bound1 >= 0:
+                            matrix.append(self.make_row(i-row_bound1, j, map, len(map), len(map[0]), self.input_size))
+                            row_bound1 -= 1                                           
+                        else:
+                            matrix.append(self.make_row(i+row_bound2, j, map, len(map), len(map[0]), self.input_size))
+                            row_bound2 += 1
+                        if row_bound2 > row_bound:
+                            break
+                        # matrix.append(self.make_row(i-2, j, map, len(map), len(map[0]), self.input_size))
+                        # matrix.append(self.make_row(i-1, j, map, len(map), len(map[0]), self.input_size))
+                        # matrix.append(self.make_row(i, j, map, len(map), len(map[0]), self.input_size))
+                        # matrix.append(self.make_row(i+1, j, map, len(map), len(map[0]), self.input_size))
+                        # matrix.append(self.make_row(i+2, j, map, len(map), len(map[0]), self.input_size))
                     return matrix
             
         print('No player on the map -> for input!')
@@ -435,13 +455,14 @@ class Tactics():
 
             # return how much player sold to the merchant
             rwd = (curr_gold - prev_gold)
-            rwd_scaled = rwd * 1000 - 1000
+            # rwd_scaled = rwd * 1000 - 1000
+            rwd_scaled = -100
             print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
             return rwd_scaled
         
         # player has moved to the gate 
         if new_field == self.gate:
-            return -2
+            return self.discovered_penalty
         
     def eval(self):
         return self.current_moves

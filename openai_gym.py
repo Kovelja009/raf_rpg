@@ -3,11 +3,14 @@ import requests
 from tactics import Tactics
 
 class RafRpg(gym.Env):
-  def __init__(self) -> None:
+  def __init__(self, number=-1) -> None:
     super().__init__()
     self.url_root = "http://localhost:8082"
     self.prev_value = 0
-    url = self.url_root+"/map/restart"
+    if number == -1:
+        url = self.url_root+"/map/restart"
+    else:
+      url = self.url_root+f"/map/restart?map_number={number}"
     payload={}
     headers = {}
     response = requests.request("PUT", url, headers=headers, data=payload)
