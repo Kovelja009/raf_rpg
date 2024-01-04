@@ -41,7 +41,7 @@ if __name__ == "__main__":
     input = game.tactics.neural_network_input(game.tactics.current_position, game.tactics.current_map)
     model = DeepQNet(len(input), 5)
     trainer = DQNTrainer(model, lr=0.005, gamma=0.95)
-    epochs = 200
+    epochs = 20
     should_print = False
     model_over_epochs = []
     file_path = "logs.txt"
