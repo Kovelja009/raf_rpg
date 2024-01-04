@@ -8,11 +8,25 @@ import os
 class DeepQNet(nn.Module):
     def __init__(self, input_size, output_size):
         super(DeepQNet, self).__init__()
-        self.hidden1 = nn.Linear(input_size,192)
+        # self.hidden1 = nn.Linear(input_size,192)
+        # self.hidden2 = nn.Linear(192, 128)
+        # self.output = nn.Linear(128, output_size)
+
+        self.n_kernels = 32
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(5,5), padding=0)
+        self.hidden1 = nn.Linear(self.n_kernels*1, 192)
         self.hidden2 = nn.Linear(192, 128)
         self.output = nn.Linear(128, output_size)
 
     def forward(self, x):
+        # x = F.relu(self.hidden1(x))
+        # x = F.relu(self.hidden2(x))
+        # x = self.output(x)
+        # return x
+        x = F.relu(self.conv1(x))
+        # batch size x (n kernels)
+        x = x.view(-1, self.n_kernels*1)
+        # print(f'x size when flattened: {x.size()}')
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
         x = self.output(x)
@@ -46,7 +60,8 @@ class DQNTrainer:
         action = torch.tensor(action, dtype=torch.long)
         reward = torch.tensor(reward, dtype=torch.float)
 
-        if len(state.shape) == 1:
+        # for matrix is 3 (channels, width, height), for nn is 1
+        if len(state.shape) == 3:
             state = torch.unsqueeze(state, 0)
             next_state = torch.unsqueeze(next_state, 0)
             action = torch.unsqueeze(action, 0)

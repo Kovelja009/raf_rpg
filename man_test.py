@@ -1,9 +1,14 @@
 from openai_gym import RafRpg
 import numpy as np
+from model import DeepQNet
+import torch as torch
 
 if __name__ == "__main__":
     game = RafRpg()
     observation = game.render()
+    inputn = game.tactics.other_input(game.tactics.current_position, observation)
+    model = DeepQNet(len(inputn), 5)
+
     print('------------------------------')
     while True:
         observation = game.tactics.current_map
@@ -13,6 +18,7 @@ if __name__ == "__main__":
         print('####')
         nn = game.tactics.other_input(game.tactics.current_position, observation)
         print(np.matrix(nn))
+        model(torch.tensor(nn, dtype=torch.float))
         key = input()
         if key == 'w':
             up = [1,0,0,0,0]

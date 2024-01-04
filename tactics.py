@@ -223,7 +223,8 @@ class Tactics():
     def x_y_manhattan_distance(self, my_position, field, map):
         distance, closest_field = self.manhattan_distance(my_position, field, map)
 
-
+        if closest_field == None:
+            return 100, 100, 100
         # x, y
         return closest_field[1] - my_position[1], closest_field[0] - my_position[0], distance
      
@@ -251,6 +252,13 @@ class Tactics():
             if d < dund:
                 xund, yund, dund = x, y, d
 
+        # x-y-distance to the closest discovered field
+        xdis, ydis, ddis = 100, 100, 100
+        for elem in self.discovered:
+            x, y, d = self.x_y_manhattan_distance(my_position, elem, map)
+            if d < ddis:
+                xdis, ydis, ddis = x, y, d
+
         # x-y-distance to the closest invalid field
         xinv, yinv, dinv = 100, 100, 100
         for elem in self.unreachable:
@@ -272,7 +280,7 @@ class Tactics():
             print(f'Cum moves: {cum_moves}')
             print('------------------------------------')
 
-        return [xv, yv, xb, yb, xund, yund, xinv, yinv]
+        return [xv, yv, xb, yb, xund, yund, xdis, ydis, xinv, yinv]
     
         # matrix of 5x5 around the player
         # 2 - undiscovered

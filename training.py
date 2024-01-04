@@ -38,7 +38,7 @@ import time
 
 if __name__ == "__main__":
     game = RafRpg()
-    input = game.tactics.neural_network_input(game.tactics.current_position, game.tactics.current_map)
+    input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
     model = DeepQNet(len(input), 5)
     trainer = DQNTrainer(model, lr=0.001, gamma=0.95)
     epochs = 30
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         new_inputs = []
         dones = []
 
-        batch_size = 3
+        batch_size = 1
 
         while not game.tactics.over:
             # if game.tactics.current_moves % 10 == 0:
@@ -66,8 +66,8 @@ if __name__ == "__main__":
             # else:
             #     should_print = False
 
-            old_input = game.tactics.neural_network_input(game.tactics.current_position, game.tactics.current_map, should_print=should_print)
-            action = trainer.model(torch.tensor(old_input, dtype=torch.float))
+            old_input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
+            action = trainer.model(torch.tensor(old_input, dtype=torch.float).unsqueeze(0))
             action_idx = torch.argmax(action).item()
             action = game.tactics.convert_idx_to_action(action_idx)
             map, reward, done, _ = game.step(action)
@@ -77,14 +77,14 @@ if __name__ == "__main__":
             if should_print:
                 print(f"Epoch: {i}")
                 print(f"Reward: {reward}")
-            new_input = game.tactics.neural_network_input(game.tactics.current_position, game.tactics.current_map, should_print=should_print)
+            new_input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
             # trainer.train_step(old_input, action, reward, new_input, done)
             
             
-            old_inputs.append(old_input)
+            old_inputs.append([old_input])
             actions.append(action)
             rewards.append(reward)
-            new_inputs.append(new_input)
+            new_inputs.append([new_input])
             dones.append(done)
 
             if len(old_inputs) == batch_size:
@@ -109,7 +109,7 @@ if __name__ == "__main__":
         print(f"\nEpoch {i} finished in {end_time - start_time} seconds")
         print(f"Epoch Metric: {metric}\n")
 
-    last = 9
+
     overall_metric = sum(model_over_epochs)/len(model_over_epochs)
     print(f"Overall metric: {overall_metric}")
     trainer.model.save()
