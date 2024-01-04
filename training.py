@@ -38,7 +38,7 @@ import time
 
 if __name__ == "__main__":
     # starting with 1
-    map_number = 1
+    map_number = 3
     epochs = 30
     batch_size = 3
 
@@ -58,7 +58,6 @@ if __name__ == "__main__":
         rewards = []
         new_inputs = []
         dones = []
-
 
         while not game.tactics.over:
             # if game.tactics.current_moves % 10 == 0:

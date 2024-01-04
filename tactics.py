@@ -52,6 +52,8 @@ class Tactics():
         # input details
         self.input_size = 3
 
+        self.xlost = -5
+        self.xwon = 5
         self.xundiscovered = 2
         self.xdiscovered = -2
         self.xunreachable = -4
@@ -391,30 +393,105 @@ class Tactics():
     # David 
     def get_reward(self, old_position, new_position, has_moved, new_field):
 
+        # # player hasn't completed task in sufficient time
+        # if self.current_moves >= self.max_moves:
+        #     print('You have run out of time!')
+        #     self.over = True
+        #     return self.insufficient_moves
+
+        # # player has enough gold to finish the game, thus the game is over
+        # # for the first RL agent
+        # if self.get_inventory_value() + self.current_gold >= self.max_gold:
+        #     self.over = True
+        #     print(f'You have sufficient amout of gold: {self.get_inventory_value() + self.current_gold}, now go and finished the game!')
+        #     return 100
+
+        # # player is waiting
+        # if has_moved == False:
+        #     print(f"You are waiting: {self.waiting_penalty}!")
+        #     return self.waiting_penalty
+        
+        # # player is attacked by a bandit
+        # if self.in_bandit_range(new_position, self.current_map):
+        #     print(f'You are attacked by a bandit: {self.bandit_rwd}!')
+        #     self.update_inventory()
+
+        #     return self.bandit_rwd
+
+
+        # # player has moved to a undiscoverd field
+        # if new_field in self.undiscovered:
+        #     prev_loot = self.get_inventory_value()
+        #     self.update_inventory()
+        #     curr_loot = self.get_inventory_value()
+        #     # rwd = (curr_loot - prev_loot) * 100
+        #     rwd = 100
+        #     print(f'New field is: {rwd}')
+        #     return rwd
+        
+        # # player has moved to a harvested field
+        # if new_field in self.discovered:
+        #     print(f'Discovered field: {self.discovered_penalty}!')
+        #     return self.discovered_penalty
+        
+        # # player has moved to a unreachable field
+        # if new_field in self.unreachable:
+        #     print(f'Illegal move: {self.invalid_penalty}!')
+        #     return self.invalid_penalty
+        
+        # # player has moved to a villager
+        # if new_field == self.villager:
+        #     prev_loot = self.get_inventory_value()
+        #     self.update_inventory()
+        #     curr_loot = self.get_inventory_value()
+        #     rwd = (curr_loot - prev_loot) * self.villager_rate
+        #     print(f'Villager is giving you a gift: {rwd}!')
+        #     return rwd
+        
+        # # player has moved to a merchant
+        # if new_field == self.merchant:
+        #     # print('Merchant is buying your items!')
+        #     prev_gold = self.current_gold
+        #     self.update_gold_amount()
+        #     curr_gold = self.current_gold
+        #     self.update_inventory()
+
+        #     # return how much player sold to the merchant
+        #     rwd = (curr_gold - prev_gold)
+        #     # rwd_scaled = rwd * 1000 - 1000
+        #     rwd_scaled = -100
+        #     print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
+        #     return rwd_scaled
+        
+        # # player has moved to the gate 
+        # if new_field == self.gate:
+        #     return self.discovered_penalty
+
+
         # player hasn't completed task in sufficient time
         if self.current_moves >= self.max_moves:
             print('You have run out of time!')
             self.over = True
-            return self.insufficient_moves
+            return self.xlost
 
         # player has enough gold to finish the game, thus the game is over
         # for the first RL agent
         if self.get_inventory_value() + self.current_gold >= self.max_gold:
             self.over = True
             print(f'You have sufficient amout of gold: {self.get_inventory_value() + self.current_gold}, now go and finished the game!')
-            return 100
+
+            return self.xwon
 
         # player is waiting
         if has_moved == False:
-            print(f"You are waiting: {self.waiting_penalty}!")
-            return self.waiting_penalty
+            print(f"You are waiting: {self.xplayer}!")
+            return self.xplayer
         
         # player is attacked by a bandit
         if self.in_bandit_range(new_position, self.current_map):
-            print(f'You are attacked by a bandit: {self.bandit_rwd}!')
+            print(f'You are attacked by a bandit: {self.xbandit}!')
             self.update_inventory()
-
-            return self.bandit_rwd
+            return self.xbandit
 
 
         # player has moved to a undiscoverd field
@@ -422,28 +499,28 @@ class Tactics():
             prev_loot = self.get_inventory_value()
             self.update_inventory()
             curr_loot = self.get_inventory_value()
-            rwd = (curr_loot - prev_loot) * 100
-            print(f'New field is: {rwd}')
-            return rwd
+            # rwd = (curr_loot - prev_loot) * 100
+            print(f'New field is: {self.xundiscovered}')
+            return self.xundiscovered
         
         # player has moved to a harvested field
         if new_field in self.discovered:
-            print(f'Discovered field: {self.discovered_penalty}!')
-            return self.discovered_penalty
+            print(f'Discovered field: {self.xdiscovered}!')
+            return self.xdiscovered
         
         # player has moved to a unreachable field
         if new_field in self.unreachable:
-            print(f'Illegal move: {self.invalid_penalty}!')
-            return self.invalid_penalty
+            print(f'Illegal move: {self.xunreachable}!')
+            return self.xunreachable
         
         # player has moved to a villager
         if new_field == self.villager:
             prev_loot = self.get_inventory_value()
             self.update_inventory()
             curr_loot = self.get_inventory_value()
-            rwd = (curr_loot - prev_loot) * self.villager_rate
-            print(f'Villager is giving you a gift: {rwd}!')
-            return rwd
+            print(f'Villager is giving you a gift: {self.xvillager}!')
+            return self.xvillager
+
         
         # player has moved to a merchant
         if new_field == self.merchant:
@@ -453,16 +530,13 @@ class Tactics():
             curr_gold = self.current_gold
             self.update_inventory()
 
-            # return how much player sold to the merchant
-            rwd = (curr_gold - prev_gold)
-            # rwd_scaled = rwd * 1000 - 1000
-            rwd_scaled = -100
-            print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
-            return rwd_scaled
+            print(f'Merchant: {self.xmerchant}')
+            return self.xmerchant
         
         # player has moved to the gate 
         if new_field == self.gate:
-            return self.discovered_penalty
+            print(f'Gate: {self.xgate}')
+            return self.xgate
         
     def eval(self):
         return self.current_moves
