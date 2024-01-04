@@ -3,8 +3,9 @@ import requests
 from tactics import Tactics
 
 class RafRpg(gym.Env):
-  def __init__(self, number=-1) -> None:
+  def __init__(self, input_size, number=-1) -> None:
     super().__init__()
+    self.input_size = input_size
     self.url_root = "http://localhost:8082"
     self.prev_value = 0
     if number == -1:
@@ -16,7 +17,7 @@ class RafRpg(gym.Env):
     response = requests.request("PUT", url, headers=headers, data=payload)
     tt = response.json()
     # print(tt,type(tt))
-    self.tactics = Tactics(self.url_root)
+    self.tactics = Tactics(self.url_root, input_size=self.input_size)
 
     
   def reset(self,number = -1):
@@ -29,7 +30,7 @@ class RafRpg(gym.Env):
     response = requests.request("PUT", url, headers=headers, data=payload)
     output = response.json()
     # print(output)
-    self.tactics = Tactics(self.url_root)
+    self.tactics = Tactics(self.url_root, input_size=self.input_size)
     return output
 
   def step(self,action):

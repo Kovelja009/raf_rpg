@@ -25,7 +25,7 @@ import numpy as np
 # Merchant ('M')
 
 class Tactics():
-    def __init__(self, url_root, max_moves=128, max_gold=55, villager_rate=150, merchant_rate=0.2, bandit_rwd=-1000, discovered_penalty=-800, invalid_penalty=-1000, waiting_penalty=-1000, insufficient_moves= -100, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bones', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
+    def __init__(self, url_root, max_moves=128, max_gold=55, input_size=3, villager_rate=150, merchant_rate=0.2, bandit_rwd=-1000, discovered_penalty=-800, invalid_penalty=-1000, waiting_penalty=-1000, insufficient_moves= -100, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bones', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
         self.max_moves = max_moves
         self.url_root = url_root
         self.max_gold = max_gold
@@ -50,7 +50,7 @@ class Tactics():
         self.villager_rwd = self.get_field_reward(villager_rwd)
 
         # input details
-        self.input_size = 3
+        self.input_size = input_size
 
         self.xlost = -5
         self.xwon = 5
@@ -139,7 +139,7 @@ class Tactics():
             # print('WAIT')
             return [0,0,0,0,1]
         else:
-            print('Error: Invalid action index!')
+            print(f'Error: Invalid action index: {idx}!')
             return None
     
     def step(self, action):

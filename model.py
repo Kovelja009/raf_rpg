@@ -11,25 +11,47 @@ class DeepQNet(nn.Module):
         # self.hidden1 = nn.Linear(input_size,192)
         # self.hidden2 = nn.Linear(192, 128)
         # self.output = nn.Linear(128, output_size)
+
+        # first convolutional iteration
         self.input_size = input_size
         self.n_kernels = 32
         self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(input_size, input_size), padding=0)
-        self.hidden1 = nn.Linear(self.n_kernels*1, 192)
-        self.hidden2 = nn.Linear(192, 128)
+        self.hidden1 = nn.Linear(self.n_kernels*1, 128)
+        self.hidden2 = nn.Linear(128, 164)
         self.output = nn.Linear(128, output_size)
+
+        # second convolutional iteration
+        # 5x5 -> 3x3
+        # self.n_kernels = 32
+        # self.n_kernels2 = 16
+        # self.conv1 = nn.Conv2d(in_channels=1, out_channels=self.n_kernels, kernel_size=(3, 3), padding=0)
+        # self.conv2 = nn.Conv2d(in_channels=self.n_kernels, out_channels=self.n_kernels2, kernel_size=(3, 3), padding=0)
+        # self.hidden1 = nn.Linear(self.n_kernels2, 192)
+        # self.hidden2 = nn.Linear(192, 128)
+        # self.output = nn.Linear(128, output_size)
+
 
     def forward(self, x):
         # x = F.relu(self.hidden1(x))
         # x = F.relu(self.hidden2(x))
         # x = self.output(x)
         # return x
-        x = F.relu(self.conv1(x))
-        # batch size x (n kernels)
+
+        # first convolutional iteration
+        x = self.conv1(x)
         x = x.view(-1, self.n_kernels*1)
-        # print(f'x size when flattened: {x.size()}')
         x = F.relu(self.hidden1(x))
         x = F.relu(self.hidden2(x))
         x = self.output(x)
+        
+        # second convolutional iteration
+        # x = self.conv1(x)
+        # x = self.conv2(x)
+        # x = x.view(-1, self.n_kernels2)
+        # x = F.relu(self.hidden1(x))
+        # x = F.relu(self.hidden2(x))
+        # x = self.output(x)
+        
         return x
 
     def save(self, file_name='model.pth'):
@@ -50,6 +72,7 @@ class DQNTrainer:
         self.model = model
         self.optimizer = optim.Adam(model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss() # tune delta
+        self.cum_loss = []
 
     # reward = immediate reward after performing the action
     # next_state = state after action is performed
@@ -104,6 +127,8 @@ class DQNTrainer:
         self.optimizer.zero_grad()
         loss = self.criterion(target, pred)
         loss.backward()
+        self.cum_loss.append(loss.detach().item())
+
 
         self.optimizer.step()
 

@@ -40,17 +40,27 @@ import random
 if __name__ == "__main__":
     # starting with 1
     map_number = 1
-    epochs = 30
-    batch_size = 3
+    epochs = 100
+    input_size = 3
+    batch_size = 1
     epsilon = 0.1
 
-    game = RafRpg(map_number)
+    game = RafRpg(input_size, map_number)
     input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
     model = DeepQNet(len(input), 5)
     trainer = DQNTrainer(model, lr=0.001, gamma=0.95)
     should_print = False
     model_over_epochs = []
-    file_path = "logs.txt"
+    file_path = "logs_step.txt"
+    file_path2 = "logs_loss.txt"
+
+    # remove content from logs_step.txt
+    with open(file_path, "w") as f:
+        f.write("")
+    # remove content from logs_loss.txt
+    with open(file_path2, "w") as f:
+        f.write("")
+
     for i in range(epochs):
         game.reset(map_number)
         start_time = time.time()
@@ -97,7 +107,7 @@ if __name__ == "__main__":
             dones.append(done)
 
             if len(old_inputs) == batch_size:
-                print("\nModel training\n")
+                # print("\nModel training\n")
                 trainer.train_step(old_inputs, actions, rewards, new_inputs, dones)
                 old_inputs = []
                 actions = []
@@ -107,7 +117,12 @@ if __name__ == "__main__":
 
 
 
+
+
 ################### kraj epohe ################
+
+        avg_loss = sum(trainer.cum_loss)/len(trainer.cum_loss)
+        trainer.cum_loss = []
 
         end_time = time.time()
         metric = game.tactics.eval()
@@ -117,6 +132,11 @@ if __name__ == "__main__":
             f.write(f"{metric}, {i}\n")
         print(f"\nEpoch {i} finished in {end_time - start_time} seconds")
         print(f"Epoch Metric: {metric}\n")
+
+        # save loss in logs_loss.txt
+        with open(file_path2, "a") as f:
+            f.write(f"{avg_loss}, {i}\n")
+
 
 
     overall_metric = sum(model_over_epochs)/len(model_over_epochs)
