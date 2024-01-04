@@ -38,12 +38,16 @@ import random
 
 
 if __name__ == "__main__":
-    # starting with 1
+    # starting with 1 ends with 5
     map_number = 1
-    epochs = 100
+    epochs = 10
+    turn_rate = 2
     input_size = 3
     batch_size = 1
-    epsilon = 0.0
+    epsilon = 0.3
+    epsilon_decay = 0.95
+
+    cnt = 0
 
     game = RafRpg(input_size, map_number)
     input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
@@ -120,6 +124,8 @@ if __name__ == "__main__":
 
 
 ################### kraj epohe ################
+        epsilon *= epsilon_decay
+
         if len(trainer.cum_loss) != 0:
             avg_loss = sum(trainer.cum_loss)/len(trainer.cum_loss)
             # save loss in logs_loss.txt
@@ -135,6 +141,14 @@ if __name__ == "__main__":
             f.write(f"{metric}, {i}\n")
         print(f"\nEpoch {i} finished in {end_time - start_time} seconds")
         print(f"Epoch Metric: {metric}\n")
+
+        # change map number
+        cnt +=1
+        if cnt == turn_rate:
+            cnt = 0
+            map_number += 1
+            if map_number > 5:
+                map_number = 1
 
 
 

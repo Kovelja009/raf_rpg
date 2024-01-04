@@ -10,7 +10,6 @@ if __name__ == "__main__":
     epochs = 100
     input_size = 3
     batch_size = 1
-    epsilon = 0.0
 
     game = RafRpg(input_size, map_number)
     input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
