@@ -2,6 +2,7 @@ from model import DeepQNet, DQNTrainer
 from openai_gym import RafRpg
 import torch
 import time
+import random
 
 
 # promeniti input (koje informacije se prosledjuju mrezi) - x, y udaljenost samo
@@ -38,9 +39,10 @@ import time
 
 if __name__ == "__main__":
     # starting with 1
-    map_number = 3
+    map_number = 1
     epochs = 30
     batch_size = 3
+    epsilon = 0.1
 
     game = RafRpg(map_number)
     input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
@@ -69,8 +71,13 @@ if __name__ == "__main__":
             #     should_print = False
 
             old_input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
-            action = trainer.model(torch.tensor(old_input, dtype=torch.float).unsqueeze(0))
-            action_idx = torch.argmax(action).item()
+            
+            if random.random() < epsilon:
+                print("Random action!")
+                action_idx = random.randint(0, 4)
+            else:
+                action = trainer.model(torch.tensor(old_input, dtype=torch.float).unsqueeze(0))
+                action_idx = torch.argmax(action).item()
             action = game.tactics.convert_idx_to_action(action_idx)
             map, reward, done, _ = game.step(action)
 
