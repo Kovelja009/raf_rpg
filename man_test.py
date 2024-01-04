@@ -7,34 +7,35 @@ if __name__ == "__main__":
     print('------------------------------')
     while True:
         observation = game.tactics.current_map
-        print(observation)
+        # print(observation)
         print('####')
         print(f"Real amount of gold is {game.tactics.current_gold}")
         print('####')
-        game.tactics.neural_network_input(game.tactics.current_position, observation)
+        nn = game.tactics.other_input(game.tactics.current_position, observation)
+        print(np.matrix(nn))
         key = input()
         if key == 'w':
             up = [1,0,0,0,0]
             observation, reward, is_over, _ = game.step(up)
-            print(observation)
+            # print(observation)
             print('------------------------------')
             print('Reward:', reward)
         elif key == 's':
             down = [0,1,0,0,0]
             observation, reward, is_over, _ = game.step(down)
-            print(observation)
+            # print(observation)
             print('------------------------------')
             print('Reward:', reward)
         elif key == 'a':
             left = [0,0,1,0,0]
             observation, reward, is_over, _ = game.step(left)
-            print(observation)
+            # print(observation)
             print('------------------------------')
             print('Reward:', reward)
         elif key == 'd':
             right = [0,0,0,1,0]
             observation, reward, is_over, _ = game.step(right)
-            print(observation)
+            # print(observation)
             print('------------------------------')
             print('Reward:', reward)
         elif key == 'q':

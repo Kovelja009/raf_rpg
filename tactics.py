@@ -1,5 +1,6 @@
 import requests
 import time
+import numpy as np
 
 # diamond -> 20
 # gem -> 14
@@ -24,13 +25,18 @@ import time
 # Merchant ('M')
 
 class Tactics():
-    def __init__(self, url_root, max_moves=200, max_gold=60, villager_rate=1.5, merchant_rate=0.2, bandit_rwd=-1000, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bones', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
+    def __init__(self, url_root, max_moves=128, max_gold=55, villager_rate=150, merchant_rate=0.2, bandit_rwd=-1000, discovered_penalty=-800, invalid_penalty=-1000, waiting_penalty=-1000, insufficient_moves= -100, lawn_rwd=['Diamond', 'Grass', 'Rice'], forest_rwd=['Stone', 'Apple', 'Wood'], highland_rwd=['Bones', 'Diamond', 'Grass', 'Wood'], villager_rwd=['Diamond', 'Rice', 'Wood']):
         self.max_moves = max_moves
         self.url_root = url_root
         self.max_gold = max_gold
         self.merchant_rate = merchant_rate
         self.villager_rate = villager_rate
         self.bandit_rwd = bandit_rwd
+        self.discovered_penalty = discovered_penalty
+        self.invalid_penalty = invalid_penalty
+        self.insufficient_moves = insufficient_moves
+        self.waiting_penalty = waiting_penalty
+
 
         self.eval_lst = []
 
@@ -42,7 +48,17 @@ class Tactics():
         self.forest_rwd = self.get_field_reward(forest_rwd)
         self.highland_rwd = self.get_field_reward(highland_rwd)
         self.villager_rwd = self.get_field_reward(villager_rwd)
-        self.illegal_move = -100
+
+        # input details
+        self.xundiscovered = 2
+        self.xdiscovered = -1
+        self.xunreachable = -3
+        self.xplayer = -3
+        self.xvillager = 3
+        self.xbandit = -3
+        self.xmerchant = 2
+        self.xgate = -1
+        self.xout_of_bounds = -3
 
         # Characters
         self.player = 'P'
@@ -219,7 +235,7 @@ class Tactics():
     #     (currently it is cumulative amount)?
 
 
-# input: x-y do seljaka, x-y do bandita, x-y do neotrivenog polja, x-y do nevalidnog polja, number of moves
+# input: x-y do seljaka, x-y do bandita, x-y do neotkrivenog polja, x-y do nevalidnog polja, number of moves
     # David
     def neural_network_input(self, my_position, map, should_print=False):
         # x-y-distance to the closest villager
@@ -257,6 +273,85 @@ class Tactics():
             print('------------------------------------')
 
         return [xv, yv, xb, yb, xund, yund, xinv, yinv]
+    
+        # matrix of 5x5 around the player
+        # 2 - undiscovered
+        # -1 - discovered
+        # -3 - unreachable
+        # -2 - player
+        # 3 - villager
+        # -3 - bandit
+        # 2 - merchant
+        # -1 - gate
+        # out of bounds - -3
+    
+    
+    # conv net
+    def other_input(self, my_position, map):
+        
+        # make matrix
+        matrix = self.make_matrix(my_position, map)
+        return matrix
+
+    def make_matrix(self, my_position, map):
+        matrix = []
+        for i, row in enumerate(map):
+            for j, field in enumerate(row):
+                if field == self.player:
+                    # 5x5_matrix
+                    matrix.append(self.make_row(i-2, j, map, len(map), len(map[0]), 5))
+                    matrix.append(self.make_row(i-1, j, map, len(map), len(map[0]), 5))
+                    matrix.append(self.make_row(i, j, map, len(map), len(map[0]), 5))
+                    matrix.append(self.make_row(i+1, j, map, len(map), len(map[0]), 5))
+                    matrix.append(self.make_row(i+2, j, map, len(map), len(map[0]), 5))
+                    return matrix
+            
+        print('No player on the map -> for input!')
+        return None
+                    
+    def gfw(self, field):
+        if field in self.discovered:
+            return self.xdiscovered
+        elif field in self.undiscovered:
+            return self.xundiscovered
+        elif field in self.unreachable:
+            return self.xunreachable
+        elif field == self.player:
+            return self.xplayer
+        elif field == self.villager:
+            return self.xvillager
+        elif field == self.bandit:
+            return self.xbandit
+        elif field == self.merchant:
+            return self.xmerchant
+        elif field == self.gate:
+            return self.xgate
+        else:
+            return self.xout_of_bounds
+
+    def make_row(self, i, j, map, bound_i, bound_j, n):
+        row = []
+        # invalid row
+        if i < 0 or i >= bound_i:
+            for _ in range(n):
+                row.append(self.xout_of_bounds)
+            return row
+        
+        col_bound = int(np.floor(n/2))
+        
+        for k in range(n):
+            idx = k - col_bound
+            # invalid field
+            if j + idx < 0 or j + idx >= bound_j:
+                row.append(self.xout_of_bounds)
+            # valid field
+            else:
+                row.append(self.gfw(map[i][j+idx]))
+        
+        return row
+
+
+
 
     
     # NOTES:[1] game is over if player has enough gold or has run out of moves or 
@@ -272,22 +367,23 @@ class Tactics():
         if self.current_moves >= self.max_moves:
             print('You have run out of time!')
             self.over = True
-            return -100
+            return self.insufficient_moves
 
         # player has enough gold to finish the game, thus the game is over
         # for the first RL agent
         if self.get_inventory_value() + self.current_gold >= self.max_gold:
             self.over = True
-            print('You have sufficient amout of gold, now go and finished the game!')
+            print(f'You have sufficient amout of gold: {self.get_inventory_value() + self.current_gold}, now go and finished the game!')
             return 100
 
         # player is waiting
         if has_moved == False:
-            return -1000
+            print(f"You are waiting: {self.waiting_penalty}!")
+            return self.waiting_penalty
         
         # player is attacked by a bandit
         if self.in_bandit_range(new_position, self.current_map):
-            print('You are attacked by a bandit!')
+            print(f'You are attacked by a bandit: {self.bandit_rwd}!')
             self.update_inventory()
 
             return self.bandit_rwd
@@ -298,24 +394,28 @@ class Tactics():
             prev_loot = self.get_inventory_value()
             self.update_inventory()
             curr_loot = self.get_inventory_value()
-            return curr_loot - prev_loot
+            rwd = (curr_loot - prev_loot) * 100
+            print(f'New field is: {rwd}')
+            return rwd
         
         # player has moved to a harvested field
         if new_field in self.discovered:
-            return -2
+            print(f'Discovered field: {self.discovered_penalty}!')
+            return self.discovered_penalty
         
         # player has moved to a unreachable field
         if new_field in self.unreachable:
-            # print('Illegal move!')
-            return self.illegal_move
+            print(f'Illegal move: {self.invalid_penalty}!')
+            return self.invalid_penalty
         
         # player has moved to a villager
         if new_field == self.villager:
-            # print('Villager is giving you a gift!')
             prev_loot = self.get_inventory_value()
             self.update_inventory()
             curr_loot = self.get_inventory_value()
-            return (curr_loot - prev_loot) * self.villager_rate
+            rwd = (curr_loot - prev_loot) * self.villager_rate
+            print(f'Villager is giving you a gift: {rwd}!')
+            return rwd
         
         # player has moved to a merchant
         if new_field == self.merchant:
@@ -327,8 +427,8 @@ class Tactics():
 
             # return how much player sold to the merchant
             rwd = (curr_gold - prev_gold)
-            rwd_scaled = rwd * self.merchant_rate
-            # print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
+            rwd_scaled = rwd * 1000 - 1000
+            print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
             return rwd_scaled
         
         # player has moved to the gate 

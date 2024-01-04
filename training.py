@@ -40,8 +40,8 @@ if __name__ == "__main__":
     game = RafRpg()
     input = game.tactics.neural_network_input(game.tactics.current_position, game.tactics.current_map)
     model = DeepQNet(len(input), 5)
-    trainer = DQNTrainer(model, lr=0.005, gamma=0.95)
-    epochs = 20
+    trainer = DQNTrainer(model, lr=0.001, gamma=0.95)
+    epochs = 30
     should_print = False
     model_over_epochs = []
     file_path = "logs.txt"
@@ -49,6 +49,13 @@ if __name__ == "__main__":
         game.reset()
         start_time = time.time()
         print('\n')
+        old_inputs = []
+        actions = []
+        rewards = []
+        new_inputs = []
+        dones = []
+
+        batch_size = 3
 
         while not game.tactics.over:
             # if game.tactics.current_moves % 10 == 0:
@@ -66,24 +73,41 @@ if __name__ == "__main__":
             map, reward, done, _ = game.step(action)
 
             # NOTE: reward is decreased for each move
-            reward -= (0.2*game.tactics.current_moves)
+            # reward -= (0.2*game.tactics.current_moves)
             if should_print:
                 print(f"Epoch: {i}")
                 print(f"Reward: {reward}")
             new_input = game.tactics.neural_network_input(game.tactics.current_position, game.tactics.current_map, should_print=should_print)
-            trainer.train_step(old_input, action, reward, new_input, done)
+            # trainer.train_step(old_input, action, reward, new_input, done)
+            
+            
+            old_inputs.append(old_input)
+            actions.append(action)
+            rewards.append(reward)
+            new_inputs.append(new_input)
+            dones.append(done)
 
-            if game.tactics.current_moves % 10 == 0:
-                game.tactics.eval()
-        
+            if len(old_inputs) == batch_size:
+                print("\nModel training\n")
+                trainer.train_step(old_inputs, actions, rewards, new_inputs, dones)
+                old_inputs = []
+                actions = []
+                rewards = []
+                new_inputs = []
+                dones = []
+
+
+
+################### kraj epohe ################
+
         end_time = time.time()
         metric = game.tactics.eval()
         model_over_epochs.append(metric)
         # save model in logs.txt
         with open(file_path, "a") as f:
             f.write(f"{metric}, {i}\n")
-        print(f"Epoch {i} finished in {end_time - start_time} seconds")
-        print(f"Epoch Metric: {metric}")
+        print(f"\nEpoch {i} finished in {end_time - start_time} seconds")
+        print(f"Epoch Metric: {metric}\n")
 
     last = 9
     overall_metric = sum(model_over_epochs)/len(model_over_epochs)
