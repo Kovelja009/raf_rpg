@@ -1,6 +1,7 @@
 import requests
 import time
 import numpy as np
+from collections import deque
 
 # diamond -> 20
 # gem -> 14
@@ -70,7 +71,7 @@ class Tactics():
         self.xxlost = -4
         self.xxwon = 10
         self.xxundiscovered = 0
-        self.xxdiscovered = -1
+        self.xxdiscovered = 0
         self.xxunreachable = -3
         self.xxplayer = -3
         self.xxvillager = -2
@@ -78,9 +79,8 @@ class Tactics():
         self.xxmerchant = 10
         self.xxgate = 0
         self.xxout_of_bounds = -4
-        self.good_direction = 2
-        self.good_dir_bound = 3
-        self.only_one_dir = 5
+
+        self.inv_dist = 100
         self.pseudo_cnt = 0
 
         # Characters
@@ -108,6 +108,9 @@ class Tactics():
         self.current_moves = 0
         self.over = False
         self.current_map = self.get_map()
+
+        # for bfs rl_agent2
+        self.bfs_not_allowed = [self.water, self.mountain, self.villager, self.bandit]
         
     def get_field_reward(self, field_rwd):
         reward = 0
@@ -243,6 +246,75 @@ class Tactics():
 
         return closest_distance, closest_field
     
+    # you can go only on discovered and undiscovered fields
+    # also cant go near bandit
+    # distance to the field acording to the rules
+    def bfs_distance(self, my_position, target_field, map, not_allowed_fields):
+        # find target_field
+        target_i, target_j = 0, 0
+        for i, row in enumerate(map):
+            for j, field in enumerate(row):
+                if field == target_field:
+                    target_i, target_j = i, j
+                    break
+
+        rows_n = len(map)
+        cols_n = len(map[0])
+
+        # up, down, left, right
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        queue = deque([my_position])
+        visited = [[False for _ in range(cols_n)] for _ in range(rows_n)]
+        visited[my_position[0]][my_position[1]] = True
+        distance = 0
+        path = {}
+
+        while queue:
+            size = len(queue)
+            distance += 1
+            for _ in range(size):
+                curr_i, curr_j = queue.popleft()
+
+                for dir_i, dir_j in directions:
+                    new_i = curr_i + dir_i
+                    new_j = curr_j + dir_j
+
+                    if new_i < 0 or new_i >= rows_n or new_j < 0 or new_j >= cols_n:
+                        continue
+                    
+                    # if valid unvisited, not near bandit field 
+                    if visited[new_i][new_j] == False and map[new_i][new_j] not in not_allowed_fields and not self.near_bandit((new_i, new_j), map, target_field):
+                        path[(new_i, new_j)] = (curr_i, curr_j)
+                        if new_i == target_i and new_j == target_j:
+                            # Reconstruct the shortest path
+                            shortest_path = [(new_i, new_j)]
+                            while (new_i, new_j) != (my_position[0], my_position[1]):
+                                new_i, new_j = path[(new_i, new_j)]
+                                shortest_path.append((new_i, new_j))
+                            shortest_path.reverse()
+                            return distance, shortest_path
+                        
+                        visited[new_i][new_j] = True
+                        queue.append((new_i, new_j))
+
+
+                
+
+    def near_bandit(self, position, map, target_field):
+        if map[position[0]][position[1]] == target_field:
+            return False
+        
+        for i, row in enumerate(map):
+            for j, field in enumerate(row):
+                if field == self.bandit:
+                    # only + fields around bandit
+                    if abs(i-position[0]) + abs(j-position[1]) <= 1:
+                        return True
+        return False
+
+
+    
     def x_y_manhattan_distance(self, my_position, field, map):
         distance, closest_field = self.manhattan_distance(my_position, field, map)
 
@@ -324,9 +396,7 @@ class Tactics():
         
         return row
     
-    def agent_two_input(self, my_position, map):
-        # xm, ym, dm = self.x_y_manhattan_distance(my_position, self.merchant, map)
-
+    def agent_two_input(self, my_position, map):     
         matrix = [[0,0,0],[0,0,0],[0,0,0]]
         matrix = self.make_matrix2(my_position, map, self.merchant)
         return matrix
@@ -335,118 +405,52 @@ class Tactics():
     def make_matrix2(self, my_position, map, goal_field):
         matrix = [[0,0,0],[0,0,0],[0,0,0]]
         pi, pj = my_position
-        rows = [-1, 0, 1]
+        # rows = [-1, 0, 1]
 
-        for row in rows:
-            idx = 1 + row
-            matrix[idx][0] = self.gfw2(pi + row, pj-1, len(map), len(map[0]), map)
-            matrix[idx][1] = self.gfw2(pi + row, pj, len(map), len(map[0]), map)
-            matrix[idx][2] = self.gfw2(pi + row, pj+1, len(map), len(map[0]), map)
+        # for row in rows:
+        #     idx = 1 + row
+        #     matrix[idx][0] = self.gfw2(pi + row, pj-1, len(map), len(map[0]), map)
+        #     matrix[idx][1] = self.gfw2(pi + row, pj, len(map), len(map[0]), map)
+        #     matrix[idx][2] = self.gfw2(pi + row, pj+1, len(map), len(map[0]), map)
 
-        #  check if there is a bandit in the matrix
-        up, down, left, right = False, False, False, False
-        for i in range(3):
-            for j in range(3):
-                if matrix[i][j] == self.xxbandit:
-                    if i == 0:
-                        up = True
-                    elif i == 2:
-                        down = True
-                    if j == 0:
-                        left = True
-                    elif j == 2:
-                        right = True
-
-        # two fields up bandit
-        if pi - 2 >= 0 and map[pi-2][pj] == self.bandit:
-            matrix[0][1] = self.xxbandit
-        # two fields down bandit
-        if pi + 2 < len(map) and map[pi+2][pj] == self.bandit:
-            matrix[2][1] = self.xxbandit
-        # two fields left bandit
-        if pj - 2 >= 0 and map[pi][pj-2] == self.bandit:
-            matrix[1][0] = self.xxbandit
-        # two fields right bandit
-        if pj + 2 < len(map[0]) and map[pi][pj+2] == self.bandit:
-            matrix[1][2] = self.xxbandit
+        # # two fields up bandit
+        # if pi - 2 >= 0 and map[pi-2][pj] == self.bandit:
+        #     matrix[0][1] = self.xxbandit
+        # # two fields down bandit
+        # if pi + 2 < len(map) and map[pi+2][pj] == self.bandit:
+        #     matrix[2][1] = self.xxbandit
+        # # two fields left bandit
+        # if pj - 2 >= 0 and map[pi][pj-2] == self.bandit:
+        #     matrix[1][0] = self.xxbandit
+        # # two fields right bandit
+        # if pj + 2 < len(map[0]) and map[pi][pj+2] == self.bandit:
+        #     matrix[1][2] = self.xxbandit
 
 
-        x, y, _ = self.x_y_manhattan_distance(my_position, goal_field, map)
+        dist, path = self.bfs_distance(my_position, goal_field, map, self.bfs_not_allowed)
 
-        # print(f'Up: {up}, Down: {down}, Left: {left}, Right: {right}')
-        # print(f'x: {x}, y: {y}')
+        if dist == None:
+            raise Exception('Distance None in BFS!')
 
-        #  give good direction reward on the left side
-        if x < 0 and not left and matrix[1][0] != self.xxmerchant and matrix[1][0] >= self.xxdiscovered:
-            # if matrix[0][0] >= 0 and not up and map[pi-1][pj-1] != self.merchant:
-            #     matrix[0][0] += self.good_direction
-            #     matrix[0][0] = min(matrix[0][0], self.good_dir_bound)
-            # if matrix[1][0] >= 0 and map[pi][pj-1] != self.merchant:
-            #     matrix[1][0] += self.good_direction
-            #     matrix[1][0] = min(matrix[1][0], self.good_dir_bound)
-            # if matrix[2][0] >= 0 and not down and map[pi+1][pj-1] != self.merchant:
-            #     matrix[2][0] += self.good_direction
-            #     matrix[2][0] = min(matrix[2][0], self.good_dir_bound)
-            matrix[1][0] += self.good_direction
-        #  give good direction reward on the right side
-        if x > 0 and not right and matrix[1][2] != self.xxmerchant and matrix[1][2] >= self.xxdiscovered:
-            # if matrix[0][2] >= 0 and not up and map[pi-1][pj+1] != self.merchant:
-            #     matrix[0][2] += self.good_direction
-            #     matrix[0][2] = min(matrix[0][2], self.good_dir_bound)
-            # if matrix[1][2] >= 0 and map[pi][pj+1] != self.merchant:
-            #     matrix[1][2] += self.good_direction
-            #     matrix[1][2] = min(matrix[1][2], self.good_dir_bound)
-            # if matrix[2][2] >= 0 and not down and map[pi+1][pj+1] != self.merchant:
-            #     matrix[2][2] += self.good_direction
-            #     matrix[2][2] = min(matrix[2][2], self.good_dir_bound)
-            matrix[1][2] += self.good_direction
-        #  give good direction reward on the up side
-        if y < 0 and not up and matrix[0][1] != self.xxmerchant and matrix[0][1] >= self.xxdiscovered:
-            # if matrix[0][0] >= 0 and not left and map[pi-1][pj-1] != self.merchant:
-            #     matrix[0][0] += self.good_direction
-            #     matrix[0][0] = min(matrix[0][0], self.good_dir_bound)
-            # if matrix[0][1] >= 0 and map[pi-1][pj] != self.merchant:
-            #     matrix[0][1] += self.good_direction
-            #     matrix[0][1] = min(matrix[0][1], self.good_dir_bound)
-            # if matrix[0][2] >= 0 and not right and map[pi-1][pj+1] != self.merchant:
-            #     matrix[0][2] += self.good_direction
-            #     matrix[0][2] = min(matrix[0][2], self.good_dir_bound)
-            matrix[0][1] += self.good_direction
-        #  give good direction reward on the down side
-        if y > 0 and not down and matrix[2][1] != self.xxmerchant and matrix[2][1] >= self.xxdiscovered:
-            # if matrix[2][0] >= 0 and not left and map[pi+1][pj-1] != self.merchant:
-            #     matrix[2][0] += self.good_direction
-            #     matrix[2][0] = min(matrix[2][0], self.good_dir_bound)
-            # if matrix[2][1] >= 0 and map[pi+1][pj] != self.merchant:
-            #     matrix[2][1] += self.good_direction
-            #     matrix[2][1] = min(matrix[2][1], self.good_dir_bound)
-            # if matrix[2][2] >= 0 and not right and map[pi+1][pj+1] != self.merchant:
-            #     matrix[2][2] += self.good_direction
-            #     matrix[2][2] = min(matrix[2][2], self.good_dir_bound)
-            matrix[2][1] += self.good_direction
+        first_step = path[1]
 
-        # if directly above me is merchant
-        if x == 0 and y < 0 and matrix[0][1] != self.xxmerchant and matrix[0][1] >= self.xxdiscovered:
-            matrix[0][1] = self.only_one_dir
-        # if directly below me is merchant
-        if x == 0 and y > 0 and matrix[2][1] != self.xxmerchant and matrix[2][1] >= self.xxdiscovered:
-            matrix[2][1] = self.only_one_dir
-        # if directly left of me is merchant
-        if x < 0 and y == 0 and matrix[1][0] != self.xxmerchant and matrix[1][0] >= self.xxdiscovered:
-            matrix[1][0] = self.only_one_dir
-        # if directly right of me is merchant
-        if x > 0 and y == 0 and matrix[1][2] != self.xxmerchant and matrix[1][2] >= self.xxdiscovered:
-            matrix[1][2] = self.only_one_dir
+        # if first step is up
+        if first_step == (pi - 1, pj):
+            matrix[0][1] = self.xxmerchant
+        # if first step is down
+        elif first_step == (pi + 1, pj):
+            matrix[2][1] = self.xxmerchant
+        # if first step is left
+        elif first_step == (pi, pj - 1):
+            matrix[1][0] = self.xxmerchant
+        # if first step is right
+        elif first_step == (pi, pj + 1):
+            matrix[1][2] = self.xxmerchant
+        else:
+            raise Exception(f'First step not valid: !')
 
-        # if on good coordinate double the reward
-        if matrix[0][1] == self.xxmerchant:
-            matrix[0][1] *= 2
-        if matrix[2][1] == self.xxmerchant:
-            matrix[2][1] *= 2
-        if matrix[1][0] == self.xxmerchant:
-            matrix[1][0] *= 2
-        if matrix[1][2] == self.xxmerchant:
-            matrix[1][2] *= 2
+        
+
 
         return matrix
 
@@ -553,6 +557,12 @@ class Tactics():
        # Agent 2 
     def agent_two_reward(self, old_position, new_position, has_moved, new_field):
 
+        distance, path = self.bfs_distance(old_position, self.merchant, self.current_map, self.bfs_not_allowed)
+        dist_award = self.inv_dist - distance
+
+        first_step = path[1]
+
+        
         # player hasn't completed task in sufficient time
         if self.current_moves >= self.max_moves:
             print('You have run out of time!')
@@ -565,46 +575,31 @@ class Tactics():
             self.over = True
             print(f'You have sufficient amout of gold: {self.current_gold}, now go to the gate!')
 
-            return self.xxwon
-
-        # player is waiting
-        if has_moved == False:
-            print(f"You are waiting: {self.xxplayer}!")
-            return self.xxplayer
+            return self.xxwon + 1000
         
         # player is attacked by a bandit
         if self.in_bandit_range(new_position, self.current_map):
             self.update_inventory()
-            # if(self.get_inventory_value() < 50):
-            #     print(f'You are attacked by a bandit: {self.xxbandit}, you lost!')
-            #     self.over = True
-            #     return self.xxlost
-            print(f'You are attacked by a bandit: {self.xxbandit}!')
+            print(f'You are attacked by a bandit!')
             self.over = True
-            return self.xxbandit
-
 
         # player has moved to an undiscoverd field
         if new_field in self.undiscovered:
             self.update_inventory()
-            print(f'New field is: {self.xxundiscovered}')
-            return self.xxundiscovered
-        
+            print(f'New field!')
+
         # player has moved to a harvested field
         if new_field in self.discovered:
-            print(f'Discovered field: {self.xxdiscovered}!')
-            return self.xxdiscovered
+            print(f'Discovered field!')
         
         # player has moved to a unreachable field
         if new_field in self.unreachable:
-            print(f'Illegal move: {self.xxunreachable}!')
-            return self.xxunreachable
+            print(f'Illegal move!')
         
         # player has moved to a villager
         if new_field == self.villager:
             self.update_inventory()
-            print(f'Villager is giving you a gift: {self.xxvillager}!')
-            return self.xxvillager
+            print(f'Villager is giving you a gift!')
 
         
         # player has moved to a merchant
@@ -628,8 +623,12 @@ class Tactics():
         
         # player has moved to the gate 
         if new_field == self.gate:
-            print(f'Gate: {self.xxgate}')
-            return self.xxgate
+            print(f'Gate')
+
+        if first_step == (new_position[0], new_position[1]):
+            return self.xxmerchant
+        else:
+            return self.xxplayer
 
         
     def eval(self):

@@ -7,13 +7,13 @@ import random
 if __name__ == "__main__":
     # starting with 1 ends with 5
     agent = 2
-    map_number = 2
-    epochs = 10
+    map_number = 5
+    epochs = 100
     turn_rate = 10
     input_size = 3
     batch_size = 1
-    epsilon = 0.0
-    epsilon_decay = 0.95
+    epsilon = 0.4
+    epsilon_decay = 0.8
 
     cnt = 0
 
