@@ -6,13 +6,14 @@ import random
 
 
 if __name__ == "__main__":
+    agent = 1
     map_number = 5
     epochs = 100
     input_size = 3
     batch_size = 1
 
-    game = RafRpg(input_size, map_number)
-    input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
+    game = RafRpg(input_size, map_number, agent)
+    input = game.tactics.agent_one_input(game.tactics.current_position, game.tactics.current_map)
 
     # load torch model
     model = DeepQNet(len(input), 5)
@@ -21,7 +22,7 @@ if __name__ == "__main__":
 
     while not game.tactics.over:
 
-            input = game.tactics.other_input(game.tactics.current_position, game.tactics.current_map)
+            input = game.tactics.agent_one_input(game.tactics.current_position, game.tactics.current_map)
             
             action = model(torch.tensor(input, dtype=torch.float).unsqueeze(0))
             action_idx = torch.argmax(action).item()

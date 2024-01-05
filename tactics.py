@@ -52,6 +52,7 @@ class Tactics():
         # input details
         self.input_size = input_size
 
+        # Agent one
         self.xlost = -5
         self.xwon = 5
         self.xundiscovered = 2
@@ -63,6 +64,24 @@ class Tactics():
         self.xmerchant = -2
         self.xgate = -2
         self.xout_of_bounds = -5
+
+        # Agent two
+
+        self.xxlost = -4
+        self.xxwon = 10
+        self.xxundiscovered = 0
+        self.xxdiscovered = -1
+        self.xxunreachable = -3
+        self.xxplayer = -3
+        self.xxvillager = -2
+        self.xxbandit = -5
+        self.xxmerchant = 10
+        self.xxgate = 0
+        self.xxout_of_bounds = -4
+        self.good_direction = 2
+        self.good_dir_bound = 3
+        self.only_one_dir = 5
+        self.pseudo_cnt = 0
 
         # Characters
         self.player = 'P'
@@ -232,79 +251,9 @@ class Tactics():
         # x, y
         return closest_field[1] - my_position[1], closest_field[0] - my_position[0], distance
      
-
-    # TODO: subject to change
-
-    # DISCUSS:
-    #   - current gold, current inventory value, seperate, or maybe cumulative
-    #     (currently it is cumulative amount)?
-
-
-# input: x-y do seljaka, x-y do bandita, x-y do neotkrivenog polja, x-y do nevalidnog polja, number of moves
-    # David
-    def neural_network_input(self, my_position, map, should_print=False):
-        # x-y-distance to the closest villager
-        xv, yv, _ = self.x_y_manhattan_distance(my_position, self.villager, map)
-        
-        # x-y-distance to the closest bandit
-        xb, yb, _  = self.x_y_manhattan_distance(my_position, self.bandit, map)
-
-        # x-y-distance to the closest undiscovered field
-        xund, yund, dund = 100, 100, 100
-        for elem in self.undiscovered:
-            x, y, d = self.x_y_manhattan_distance(my_position, elem, map)
-            if d < dund:
-                xund, yund, dund = x, y, d
-
-        # x-y-distance to the closest discovered field
-        xdis, ydis, ddis = 100, 100, 100
-        for elem in self.discovered:
-            x, y, d = self.x_y_manhattan_distance(my_position, elem, map)
-            if d < ddis:
-                xdis, ydis, ddis = x, y, d
-
-        # x-y-distance to the closest invalid field
-        xinv, yinv, dinv = 100, 100, 100
-        for elem in self.unreachable:
-            x, y, d = self.x_y_manhattan_distance(my_position, elem, map)
-            if d < dinv:
-                xinv, yinv, dinv = x, y, d
-
-        # amount of cum moves
-        cum_moves = self.current_moves
-
-        if should_print:
-            print(f'Player position: {my_position}')
-            print(f'Real amount of gold: {self.current_gold}')
-            print(f'Inventory value: {self.get_inventory_value()}')
-            print(f'Villager direction: {xv}, {yv}')
-            print(f'Bandit direction: {xb}, {yb}')
-            print(f'Undiscovered direction: {xund}, {yund}')
-            print(f'Invalid direction: {xinv}, {yinv}')
-            print(f'Cum moves: {cum_moves}')
-            print('------------------------------------')
-
-        return [xv, yv, xb, yb, xund, yund, xdis, ydis, xinv, yinv]
-    
-
-
-
-
-
-        # matrix of 5x5 around the player
-        # 2 - undiscovered
-        # -1 - discovered
-        # -3 - unreachable
-        # -2 - player
-        # 3 - villager
-        # -3 - bandit
-        # 2 - merchant
-        # -1 - gate
-        # out of bounds - -3
-    
     
     # conv net
-    def other_input(self, my_position, map):
+    def agent_one_input(self, my_position, map):
         
         # make matrix
         matrix = self.make_matrix(my_position, map)
@@ -329,11 +278,6 @@ class Tactics():
                             row_bound2 += 1
                         if row_bound2 > row_bound:
                             break
-                        # matrix.append(self.make_row(i-2, j, map, len(map), len(map[0]), self.input_size))
-                        # matrix.append(self.make_row(i-1, j, map, len(map), len(map[0]), self.input_size))
-                        # matrix.append(self.make_row(i, j, map, len(map), len(map[0]), self.input_size))
-                        # matrix.append(self.make_row(i+1, j, map, len(map), len(map[0]), self.input_size))
-                        # matrix.append(self.make_row(i+2, j, map, len(map), len(map[0]), self.input_size))
                     return matrix
             
         print('No player on the map -> for input!')
@@ -379,94 +323,161 @@ class Tactics():
                 row.append(self.gfw(map[i][j+idx]))
         
         return row
-
-
-
-
     
-    # NOTES:[1] game is over if player has enough gold or has run out of moves or 
-    #           has reached the gate with enough gold
-    #       [2] even though we might have enougn gold, merchant might not buy all of our items
-    #           so we need to wait few more moves to sell the rest of the items (when merchant replenishes)
-    
-    
-    # David 
-    def get_reward(self, old_position, new_position, has_moved, new_field):
+    def agent_two_input(self, my_position, map):
+        # xm, ym, dm = self.x_y_manhattan_distance(my_position, self.merchant, map)
 
-        # # player hasn't completed task in sufficient time
-        # if self.current_moves >= self.max_moves:
-        #     print('You have run out of time!')
-        #     self.over = True
-        #     return self.insufficient_moves
+        matrix = [[0,0,0],[0,0,0],[0,0,0]]
+        matrix = self.make_matrix2(my_position, map, self.merchant)
+        return matrix
 
-        # # player has enough gold to finish the game, thus the game is over
-        # # for the first RL agent
-        # if self.get_inventory_value() + self.current_gold >= self.max_gold:
-        #     self.over = True
-        #     print(f'You have sufficient amout of gold: {self.get_inventory_value() + self.current_gold}, now go and finished the game!')
-        #     return 100
+    # 3x3 matrix around player
+    def make_matrix2(self, my_position, map, goal_field):
+        matrix = [[0,0,0],[0,0,0],[0,0,0]]
+        pi, pj = my_position
+        rows = [-1, 0, 1]
 
-        # # player is waiting
-        # if has_moved == False:
-        #     print(f"You are waiting: {self.waiting_penalty}!")
-        #     return self.waiting_penalty
-        
-        # # player is attacked by a bandit
-        # if self.in_bandit_range(new_position, self.current_map):
-        #     print(f'You are attacked by a bandit: {self.bandit_rwd}!')
-        #     self.update_inventory()
+        for row in rows:
+            idx = 1 + row
+            matrix[idx][0] = self.gfw2(pi + row, pj-1, len(map), len(map[0]), map)
+            matrix[idx][1] = self.gfw2(pi + row, pj, len(map), len(map[0]), map)
+            matrix[idx][2] = self.gfw2(pi + row, pj+1, len(map), len(map[0]), map)
 
-        #     return self.bandit_rwd
+        #  check if there is a bandit in the matrix
+        up, down, left, right = False, False, False, False
+        for i in range(3):
+            for j in range(3):
+                if matrix[i][j] == self.xxbandit:
+                    if i == 0:
+                        up = True
+                    elif i == 2:
+                        down = True
+                    if j == 0:
+                        left = True
+                    elif j == 2:
+                        right = True
+
+        # two fields up bandit
+        if pi - 2 >= 0 and map[pi-2][pj] == self.bandit:
+            matrix[0][1] = self.xxbandit
+        # two fields down bandit
+        if pi + 2 < len(map) and map[pi+2][pj] == self.bandit:
+            matrix[2][1] = self.xxbandit
+        # two fields left bandit
+        if pj - 2 >= 0 and map[pi][pj-2] == self.bandit:
+            matrix[1][0] = self.xxbandit
+        # two fields right bandit
+        if pj + 2 < len(map[0]) and map[pi][pj+2] == self.bandit:
+            matrix[1][2] = self.xxbandit
 
 
-        # # player has moved to a undiscoverd field
-        # if new_field in self.undiscovered:
-        #     prev_loot = self.get_inventory_value()
-        #     self.update_inventory()
-        #     curr_loot = self.get_inventory_value()
-        #     # rwd = (curr_loot - prev_loot) * 100
-        #     rwd = 100
-        #     print(f'New field is: {rwd}')
-        #     return rwd
-        
-        # # player has moved to a harvested field
-        # if new_field in self.discovered:
-        #     print(f'Discovered field: {self.discovered_penalty}!')
-        #     return self.discovered_penalty
-        
-        # # player has moved to a unreachable field
-        # if new_field in self.unreachable:
-        #     print(f'Illegal move: {self.invalid_penalty}!')
-        #     return self.invalid_penalty
-        
-        # # player has moved to a villager
-        # if new_field == self.villager:
-        #     prev_loot = self.get_inventory_value()
-        #     self.update_inventory()
-        #     curr_loot = self.get_inventory_value()
-        #     rwd = (curr_loot - prev_loot) * self.villager_rate
-        #     print(f'Villager is giving you a gift: {rwd}!')
-        #     return rwd
-        
-        # # player has moved to a merchant
-        # if new_field == self.merchant:
-        #     # print('Merchant is buying your items!')
-        #     prev_gold = self.current_gold
-        #     self.update_gold_amount()
-        #     curr_gold = self.current_gold
-        #     self.update_inventory()
+        x, y, _ = self.x_y_manhattan_distance(my_position, goal_field, map)
 
-        #     # return how much player sold to the merchant
-        #     rwd = (curr_gold - prev_gold)
-        #     # rwd_scaled = rwd * 1000 - 1000
-        #     rwd_scaled = -100
-        #     print(f'Merchant scaled: {rwd_scaled}, but sold: {rwd}')
-        #     return rwd_scaled
-        
-        # # player has moved to the gate 
-        # if new_field == self.gate:
-        #     return self.discovered_penalty
+        # print(f'Up: {up}, Down: {down}, Left: {left}, Right: {right}')
+        # print(f'x: {x}, y: {y}')
 
+        #  give good direction reward on the left side
+        if x < 0 and not left and matrix[1][0] != self.xxmerchant and matrix[1][0] >= self.xxdiscovered:
+            # if matrix[0][0] >= 0 and not up and map[pi-1][pj-1] != self.merchant:
+            #     matrix[0][0] += self.good_direction
+            #     matrix[0][0] = min(matrix[0][0], self.good_dir_bound)
+            # if matrix[1][0] >= 0 and map[pi][pj-1] != self.merchant:
+            #     matrix[1][0] += self.good_direction
+            #     matrix[1][0] = min(matrix[1][0], self.good_dir_bound)
+            # if matrix[2][0] >= 0 and not down and map[pi+1][pj-1] != self.merchant:
+            #     matrix[2][0] += self.good_direction
+            #     matrix[2][0] = min(matrix[2][0], self.good_dir_bound)
+            matrix[1][0] += self.good_direction
+        #  give good direction reward on the right side
+        if x > 0 and not right and matrix[1][2] != self.xxmerchant and matrix[1][2] >= self.xxdiscovered:
+            # if matrix[0][2] >= 0 and not up and map[pi-1][pj+1] != self.merchant:
+            #     matrix[0][2] += self.good_direction
+            #     matrix[0][2] = min(matrix[0][2], self.good_dir_bound)
+            # if matrix[1][2] >= 0 and map[pi][pj+1] != self.merchant:
+            #     matrix[1][2] += self.good_direction
+            #     matrix[1][2] = min(matrix[1][2], self.good_dir_bound)
+            # if matrix[2][2] >= 0 and not down and map[pi+1][pj+1] != self.merchant:
+            #     matrix[2][2] += self.good_direction
+            #     matrix[2][2] = min(matrix[2][2], self.good_dir_bound)
+            matrix[1][2] += self.good_direction
+        #  give good direction reward on the up side
+        if y < 0 and not up and matrix[0][1] != self.xxmerchant and matrix[0][1] >= self.xxdiscovered:
+            # if matrix[0][0] >= 0 and not left and map[pi-1][pj-1] != self.merchant:
+            #     matrix[0][0] += self.good_direction
+            #     matrix[0][0] = min(matrix[0][0], self.good_dir_bound)
+            # if matrix[0][1] >= 0 and map[pi-1][pj] != self.merchant:
+            #     matrix[0][1] += self.good_direction
+            #     matrix[0][1] = min(matrix[0][1], self.good_dir_bound)
+            # if matrix[0][2] >= 0 and not right and map[pi-1][pj+1] != self.merchant:
+            #     matrix[0][2] += self.good_direction
+            #     matrix[0][2] = min(matrix[0][2], self.good_dir_bound)
+            matrix[0][1] += self.good_direction
+        #  give good direction reward on the down side
+        if y > 0 and not down and matrix[2][1] != self.xxmerchant and matrix[2][1] >= self.xxdiscovered:
+            # if matrix[2][0] >= 0 and not left and map[pi+1][pj-1] != self.merchant:
+            #     matrix[2][0] += self.good_direction
+            #     matrix[2][0] = min(matrix[2][0], self.good_dir_bound)
+            # if matrix[2][1] >= 0 and map[pi+1][pj] != self.merchant:
+            #     matrix[2][1] += self.good_direction
+            #     matrix[2][1] = min(matrix[2][1], self.good_dir_bound)
+            # if matrix[2][2] >= 0 and not right and map[pi+1][pj+1] != self.merchant:
+            #     matrix[2][2] += self.good_direction
+            #     matrix[2][2] = min(matrix[2][2], self.good_dir_bound)
+            matrix[2][1] += self.good_direction
+
+        # if directly above me is merchant
+        if x == 0 and y < 0 and matrix[0][1] != self.xxmerchant and matrix[0][1] >= self.xxdiscovered:
+            matrix[0][1] = self.only_one_dir
+        # if directly below me is merchant
+        if x == 0 and y > 0 and matrix[2][1] != self.xxmerchant and matrix[2][1] >= self.xxdiscovered:
+            matrix[2][1] = self.only_one_dir
+        # if directly left of me is merchant
+        if x < 0 and y == 0 and matrix[1][0] != self.xxmerchant and matrix[1][0] >= self.xxdiscovered:
+            matrix[1][0] = self.only_one_dir
+        # if directly right of me is merchant
+        if x > 0 and y == 0 and matrix[1][2] != self.xxmerchant and matrix[1][2] >= self.xxdiscovered:
+            matrix[1][2] = self.only_one_dir
+
+        # if on good coordinate double the reward
+        if matrix[0][1] == self.xxmerchant:
+            matrix[0][1] *= 2
+        if matrix[2][1] == self.xxmerchant:
+            matrix[2][1] *= 2
+        if matrix[1][0] == self.xxmerchant:
+            matrix[1][0] *= 2
+        if matrix[1][2] == self.xxmerchant:
+            matrix[1][2] *= 2
+
+        return matrix
+
+
+
+    def gfw2(self, i, j, i_bound, j_bound, map):
+        field = map[i][j]
+        if i < 0 or i >= i_bound or j < 0 or j >= j_bound:
+            return self.xxout_of_bounds
+        else:
+            if field in self.discovered:
+                return self.xxdiscovered
+            elif field in self.undiscovered:
+                return self.xxundiscovered
+            elif field in self.unreachable:
+                return self.xxunreachable
+            elif field == self.player:
+                return self.xxplayer
+            elif field == self.villager:
+                return self.xxvillager
+            elif field == self.bandit:
+                return self.xxbandit
+            elif field == self.merchant:
+                return self.xxmerchant
+            elif field == self.gate:
+                return self.xxgate
+            else:
+                return self.xxout_of_bounds
+
+    # Agent 1 
+    def agent_one_reward(self, old_position, new_position, has_moved, new_field):
 
         # player hasn't completed task in sufficient time
         if self.current_moves >= self.max_moves:
@@ -478,7 +489,7 @@ class Tactics():
         # for the first RL agent
         if self.get_inventory_value() + self.current_gold >= self.max_gold:
             self.over = True
-            print(f'You have sufficient amout of gold: {self.get_inventory_value() + self.current_gold}, now go and finished the game!')
+            print(f'You have sufficient amout of gold: {self.get_inventory_value() + self.current_gold}, now go to the merchant!')
 
             return self.xwon
 
@@ -494,7 +505,7 @@ class Tactics():
             return self.xbandit
 
 
-        # player has moved to a undiscoverd field
+        # player has moved to an undiscoverd field
         if new_field in self.undiscovered:
             prev_loot = self.get_inventory_value()
             self.update_inventory()
@@ -508,7 +519,7 @@ class Tactics():
             print(f'Discovered field: {self.xdiscovered}!')
             return self.xdiscovered
         
-        # player has moved to a unreachable field
+        # player has moved to an unreachable field
         if new_field in self.unreachable:
             print(f'Illegal move: {self.xunreachable}!')
             return self.xunreachable
@@ -530,13 +541,96 @@ class Tactics():
             curr_gold = self.current_gold
             self.update_inventory()
 
-            print(f'Merchant: {self.xmerchant}')
-            return self.xmerchant
+            print(f'Merchant: {self.xmerchant * 2}')
+            return self.xmerchant * 2
         
         # player has moved to the gate 
         if new_field == self.gate:
             print(f'Gate: {self.xgate}')
             return self.xgate
+        
+
+       # Agent 2 
+    def agent_two_reward(self, old_position, new_position, has_moved, new_field):
+
+        # player hasn't completed task in sufficient time
+        if self.current_moves >= self.max_moves:
+            print('You have run out of time!')
+            self.over = True
+            return self.xxlost
+
+        # player has enough gold to finish the game, thus the game is over
+        # for the second RL agent
+        if self.current_gold >= 50:
+            self.over = True
+            print(f'You have sufficient amout of gold: {self.current_gold}, now go to the gate!')
+
+            return self.xxwon
+
+        # player is waiting
+        if has_moved == False:
+            print(f"You are waiting: {self.xxplayer}!")
+            return self.xxplayer
+        
+        # player is attacked by a bandit
+        if self.in_bandit_range(new_position, self.current_map):
+            self.update_inventory()
+            # if(self.get_inventory_value() < 50):
+            #     print(f'You are attacked by a bandit: {self.xxbandit}, you lost!')
+            #     self.over = True
+            #     return self.xxlost
+            print(f'You are attacked by a bandit: {self.xxbandit}!')
+            self.over = True
+            return self.xxbandit
+
+
+        # player has moved to an undiscoverd field
+        if new_field in self.undiscovered:
+            self.update_inventory()
+            print(f'New field is: {self.xxundiscovered}')
+            return self.xxundiscovered
+        
+        # player has moved to a harvested field
+        if new_field in self.discovered:
+            print(f'Discovered field: {self.xxdiscovered}!')
+            return self.xxdiscovered
+        
+        # player has moved to a unreachable field
+        if new_field in self.unreachable:
+            print(f'Illegal move: {self.xxunreachable}!')
+            return self.xxunreachable
+        
+        # player has moved to a villager
+        if new_field == self.villager:
+            self.update_inventory()
+            print(f'Villager is giving you a gift: {self.xxvillager}!')
+            return self.xxvillager
+
+        
+        # player has moved to a merchant
+        if new_field == self.merchant:
+            self.update_gold_amount()
+            curr_gold = self.current_gold
+            self.update_inventory()
+
+            # if curr_gold >= 50:
+            #     self.over = True
+            #     print(f'You have sufficient amout of gold: {curr_gold}, now go to the gate!')
+            #     return self.xxwon
+            self.pseudo_cnt += 1
+            if self.pseudo_cnt >= 5:
+                self.over = True
+                print(f'Merchant sold enough, now go to the gate!')
+                return self.xxwon
+
+            print(f'Merchant: {self.xxmerchant}')
+            return self.xxmerchant
+        
+        # player has moved to the gate 
+        if new_field == self.gate:
+            print(f'Gate: {self.xxgate}')
+            return self.xxgate
+
         
     def eval(self):
         return self.current_moves

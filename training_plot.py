@@ -16,12 +16,12 @@ def plot_training(history, history2):
     
 if __name__ == "__main__":
     history = []
-    with open("logs_step.txt", "r") as f:
+    with open("logs_step2.txt", "r") as f:
         for line in f:
             history.append(int(line.split(",")[0]))
 
     history2 = []
-    with open("logs_loss.txt", "r") as f:
+    with open("logs_loss2.txt", "r") as f:
         for line in f:
             history2.append(float(line.split(",")[0]))
     plot_training(history, history2)
