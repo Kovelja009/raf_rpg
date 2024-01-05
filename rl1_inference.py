@@ -6,7 +6,7 @@ import random
 
 
 if __name__ == "__main__":
-    map_number = 1
+    map_number = 5
     epochs = 100
     input_size = 3
     batch_size = 1

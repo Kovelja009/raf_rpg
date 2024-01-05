@@ -40,8 +40,8 @@ import random
 if __name__ == "__main__":
     # starting with 1 ends with 5
     map_number = 1
-    epochs = 10
-    turn_rate = 2
+    epochs = 300
+    turn_rate = 10
     input_size = 3
     batch_size = 1
     epsilon = 0.3
