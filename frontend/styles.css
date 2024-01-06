@@ -14,13 +14,13 @@ body {
 #game-map {
     display: grid;
     /* Adjust the grid-template-columns based on your map's width */
-    grid-template-columns: repeat(26, 40px); /* Assuming 26 columns and each tile is 40px wide */
+    grid-template-columns: repeat(26, 45px); /* Assuming 26 columns and each tile is 40px wide */
 }
 
 .tile {
-    width: 40px;
-    height: 40px;
-    background-image: url('placeholder.png'); /* Placeholder image for each tile */
+    width: 45px;
+    height: 45px;
+    background-image: url('placeholder.png'); /*Placeholder image for each tile*/
     background-size: cover;
 }
 

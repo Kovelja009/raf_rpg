@@ -44,13 +44,6 @@ if __name__ == "__main__":
         dones = []
 
         while not game.tactics.over:
-            # if game.tactics.current_moves % 10 == 0:
-            #     print("#################")
-            #     print(game.tactics.current_map)
-            #     print("#################")
-            #     should_print = True
-            # else:
-            #     should_print = False
 
             old_input = game.tactics.agent_two_input(game.tactics.current_position, game.tactics.current_map)
             
@@ -76,7 +69,6 @@ if __name__ == "__main__":
             dones.append(done)
 
             if len(old_inputs) == batch_size:
-                # print("\nModel training\n")
                 trainer.train_step(old_inputs, actions, rewards, new_inputs, dones)
                 old_inputs = []
                 actions = []
