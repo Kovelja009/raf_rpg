@@ -503,7 +503,7 @@ class Tactics():
             return self.xplayer
         
         # player is attacked by a bandit
-        if self.in_bandit_range(new_position, self.current_map):
+        if self.near_bandit(new_position, self.current_map, self.merchant):
             print(f'You are attacked by a bandit: {self.xbandit}!')
             self.update_inventory()
             return self.xbandit
