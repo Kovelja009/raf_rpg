@@ -104,14 +104,18 @@ class Tactics():
         self.update_inventory()
         self.current_gold = 0
         self.update_gold_amount()
-        self.current_position, _ = self.get_player_position()
+        self.current_position = self.get_player_position()
         self.current_moves = 0
         self.over = False
         self.current_map = self.get_map()
 
         # for bfs rl_agent2
-        self.bfs_not_allowed = [self.water, self.mountain, self.villager, self.bandit]
+        self.bfs_not_allowed2 = [self.water, self.mountain, self.villager, self.bandit]
         
+        # for bfs rl_agent3
+        self.bfs_not_allowed3 = [self.water, self.mountain, self.villager, self.bandit, self.merchant]
+        
+
     def get_field_reward(self, field_rwd):
         reward = 0
         for rwd in field_rwd:
@@ -298,6 +302,8 @@ class Tactics():
                         visited[new_i][new_j] = True
                         queue.append((new_i, new_j))
 
+        return None, None
+
 
                 
 
@@ -397,40 +403,23 @@ class Tactics():
         return row
     
     def agent_two_input(self, my_position, map):     
-        matrix = [[0,0,0],[0,0,0],[0,0,0]]
-        matrix = self.make_matrix2(my_position, map, self.merchant)
+        matrix = self.make_matrix2(my_position, map, self.merchant, self.bfs_not_allowed2)
+        return matrix
+    
+    def agent_three_input(self, my_position, map):
+        matrix = self.make_matrix2(my_position, map, self.gate, self.bfs_not_allowed3)
         return matrix
 
     # 3x3 matrix around player
-    def make_matrix2(self, my_position, map, goal_field):
+    def make_matrix2(self, my_position, map, goal_field, not_allowed_fields):
         matrix = [[0,0,0],[0,0,0],[0,0,0]]
         pi, pj = my_position
-        # rows = [-1, 0, 1]
 
-        # for row in rows:
-        #     idx = 1 + row
-        #     matrix[idx][0] = self.gfw2(pi + row, pj-1, len(map), len(map[0]), map)
-        #     matrix[idx][1] = self.gfw2(pi + row, pj, len(map), len(map[0]), map)
-        #     matrix[idx][2] = self.gfw2(pi + row, pj+1, len(map), len(map[0]), map)
-
-        # # two fields up bandit
-        # if pi - 2 >= 0 and map[pi-2][pj] == self.bandit:
-        #     matrix[0][1] = self.xxbandit
-        # # two fields down bandit
-        # if pi + 2 < len(map) and map[pi+2][pj] == self.bandit:
-        #     matrix[2][1] = self.xxbandit
-        # # two fields left bandit
-        # if pj - 2 >= 0 and map[pi][pj-2] == self.bandit:
-        #     matrix[1][0] = self.xxbandit
-        # # two fields right bandit
-        # if pj + 2 < len(map[0]) and map[pi][pj+2] == self.bandit:
-        #     matrix[1][2] = self.xxbandit
-
-
-        dist, path = self.bfs_distance(my_position, goal_field, map, self.bfs_not_allowed)
+        dist, path = self.bfs_distance(my_position, goal_field, map, not_allowed_fields)
 
         if dist == None:
-            raise Exception('Distance None in BFS!')
+            print('Distance None in BFS!')
+            return matrix
 
         first_step = path[1]
 
@@ -448,9 +437,6 @@ class Tactics():
             matrix[1][2] = self.xxmerchant
         else:
             raise Exception(f'First step not valid: !')
-
-        
-
 
         return matrix
 
@@ -557,8 +543,7 @@ class Tactics():
        # Agent 2 
     def agent_two_reward(self, old_position, new_position, has_moved, new_field):
 
-        distance, path = self.bfs_distance(old_position, self.merchant, self.current_map, self.bfs_not_allowed)
-        dist_award = self.inv_dist - distance
+        _, path = self.bfs_distance(old_position, self.merchant, self.current_map, self.bfs_not_allowed2)
 
         first_step = path[1]
 
@@ -624,6 +609,65 @@ class Tactics():
         # player has moved to the gate 
         if new_field == self.gate:
             print(f'Gate')
+
+        if first_step == (new_position[0], new_position[1]):
+            return self.xxmerchant
+        else:
+            return self.xxplayer
+
+
+       # Agent 3 
+    def agent_three_reward(self, old_position, new_position, has_moved, new_field):
+
+        _, path = self.bfs_distance(old_position, self.gate, self.current_map, self.bfs_not_allowed3)
+        if path == None:
+            self.over = True
+            print('No path to the gate!')
+            return self.xxwon
+        
+        first_step = path[1]
+        
+        # player hasn't completed task in sufficient time
+        if self.current_moves >= self.max_moves:
+            print('You have run out of time!')
+            self.over = True
+            return self.xxlost
+        
+        # player is attacked by a bandit
+        if self.in_bandit_range(new_position, self.current_map):
+            self.update_inventory()
+            print(f'You are attacked by a bandit!')
+
+        # player has moved to an undiscoverd field
+        if new_field in self.undiscovered:
+            self.update_inventory()
+            print(f'New field!')
+
+        # player has moved to a harvested field
+        if new_field in self.discovered:
+            print(f'Discovered field!')
+        
+        # player has moved to a unreachable field
+        if new_field in self.unreachable:
+            print(f'Illegal move!')
+        
+        # player has moved to a villager
+        if new_field == self.villager:
+            self.update_inventory()
+            print(f'Villager is giving you a gift!')
+
+        
+        # player has moved to a merchant
+        if new_field == self.merchant:
+            self.update_gold_amount()
+            self.update_inventory()
+            print(f'Merchant!')
+        
+        # player has moved to the gate 
+        if new_field == self.gate:
+            self.over = True
+            print(f'Gate')
+            return self.xxwon
 
         if first_step == (new_position[0], new_position[1]):
             return self.xxmerchant

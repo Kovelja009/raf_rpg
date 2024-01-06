@@ -6,10 +6,10 @@ import torch as torch
 if __name__ == "__main__":
     map_number = 1
     input_size = 3
-    agent = 2
+    agent = 1
     game = RafRpg(input_size=input_size, number=map_number, agent=agent)
     observation = game.render()
-    inputn = game.tactics.agent_two_input(game.tactics.current_position, observation)
+    inputn = game.return_nn_input(game.tactics.current_position, observation)
     model = DeepQNet(len(inputn[0]), 5)
 
     print('------------------------------')
@@ -19,7 +19,7 @@ if __name__ == "__main__":
         print('####')
         print(f"Real amount of gold is {game.tactics.current_gold}")
         print('####')
-        nn = game.tactics.agent_two_input(game.tactics.current_position, observation)
+        nn = game.return_nn_input(game.tactics.current_position, observation)
         print(np.matrix(nn))
         model(torch.tensor(nn, dtype=torch.float).unsqueeze(0))
         key = input()
@@ -55,6 +55,6 @@ if __name__ == "__main__":
 
         if is_over:
             print("Game over")
-            nn = game.tactics.agent_two_input(game.tactics.current_position, observation)
+            nn = game.return_nn_input(game.tactics.current_position, observation)
             print(np.matrix(nn))
             break

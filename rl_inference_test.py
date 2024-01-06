@@ -1,27 +1,28 @@
-from model import DeepQNet, DQNTrainer
+from model import DeepQNet
 from openai_gym import RafRpg
 import torch
-import time
-import random
 
 
 if __name__ == "__main__":
-    agent = 1
-    map_number = 5
+    agent = 3
+    map_number = 1
     input_size = 3
     batch_size = 1
 
     game = RafRpg(input_size, map_number, agent)
-    input = game.tactics.agent_one_input(game.tactics.current_position, game.tactics.current_map)
+    input = game.return_nn_input(game.tactics.current_position, game.tactics.current_map)
 
     # load torch model
     model = DeepQNet(len(input), 5)
-    model.load_state_dict(torch.load('./models/rl1_model.pth'))
+    if agent == 1:
+        model.load_state_dict(torch.load('./models/rl1_model.pth'))
+    if agent == 2 or agent == 3:
+        model.load_state_dict(torch.load('./models/rl2_model.pth'))
     model.eval()
 
     while not game.tactics.over:
 
-            input = game.tactics.agent_one_input(game.tactics.current_position, game.tactics.current_map)
+            input = game.return_nn_input(game.tactics.current_position, game.tactics.current_map)
             
             action = model(torch.tensor(input, dtype=torch.float).unsqueeze(0))
             action_idx = torch.argmax(action).item()

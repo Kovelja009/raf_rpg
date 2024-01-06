@@ -36,10 +36,20 @@ class RafRpg(gym.Env):
       reward = self.tactics.agent_one_reward(prev, curr, has_moved=self.tactics.has_moved(action), new_field=new_field)
     if self.agent == 2:
       reward = self.tactics.agent_two_reward(prev, curr, has_moved=self.tactics.has_moved(action), new_field=new_field)
+    if self.agent == 3:
+      reward = self.tactics.agent_three_reward(prev, curr, has_moved=self.tactics.has_moved(action), new_field=new_field)
 
     is_over = self.tactics.is_over()
 
     return self.tactics.current_map, reward, is_over, {}
+  
+  def return_nn_input(self, position, map):
+    if self.agent == 1:
+      return self.tactics.agent_one_input(position, map)
+    if self.agent == 2:
+      return self.tactics.agent_two_input(position, map)
+    if self.agent == 3:
+      return self.tactics.agent_three_input(position, map)
 
   def render(self):
     payload={}
